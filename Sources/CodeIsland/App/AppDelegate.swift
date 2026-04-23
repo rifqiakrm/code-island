@@ -1,0 +1,152 @@
+import AppKit
+import SwiftUI
+import Combine
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var notchWindowController: NotchWindowController?
+    private var menuBarManager: MenuBarManager?
+    private var onboardingController: OnboardingWindowController?
+    private let sessionStore = SessionStore()
+    private let socketServer = SocketServer()
+    private let soundEngine = SoundEngine()
+    private let settingsStore = SettingsStore()
+    private let rateLimitStore = RateLimitStore()
+    private var cancellables = Set<AnyCancellable>()
+
+    private func log(_ msg: String) {
+        let line = "[\(DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium))] \(msg)\n"
+        let logFile = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".code-island/debug.log")
+        if let handle = try? FileHandle(forWritingTo: logFile) {
+            handle.seekToEndOfFile()
+            handle.write(line.data(using: .utf8)!)
+            handle.closeFile()
+        } else {
+            try? line.write(to: logFile, atomically: true, encoding: .utf8)
+        }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        log("App launching...")
+        // Hide dock icon (LSUIElement backup)
+        NSApp.setActivationPolicy(.accessory)
+
+        // Wire up socket → session store → sound
+        socketServer.onMessage = { [weak self] message, respond, respondRaw in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.log("Received: \(message.hookEvent) session=\(message.sessionId.prefix(8))")
+                self.sessionStore.handleMessage(message, respond: respond, respondRaw: respondRaw)
+            }
+        }
+
+        sessionStore.onEvent
+            .sink { [weak self] event in
+                self?.soundEngine.play(event)
+                self?.notchWindowController?.handleSessionEvent(event)
+            }
+            .store(in: &cancellables)
+
+        // Sync sound settings
+        settingsStore.$soundEnabled
+            .sink { [weak self] enabled in self?.soundEngine.setEnabled(enabled) }
+            .store(in: &cancellables)
+        settingsStore.$soundVolume
+            .sink { [weak self] volume in self?.soundEngine.setVolume(volume) }
+            .store(in: &cancellables)
+        settingsStore.$soundSessionStart
+            .sink { [weak self] on in
+                self?.soundEngine.setEventEnabled(.sessionStart, enabled: on)
+                self?.soundEngine.setEventEnabled(.sessionEnd, enabled: on)
+            }
+            .store(in: &cancellables)
+        settingsStore.$soundCompletion
+            .sink { [weak self] on in self?.soundEngine.setEventEnabled(.completion, enabled: on) }
+            .store(in: &cancellables)
+        settingsStore.$soundToolUse
+            .sink { [weak self] on in self?.soundEngine.setEventEnabled(.toolUse, enabled: on) }
+            .store(in: &cancellables)
+        settingsStore.$soundError
+            .sink { [weak self] on in self?.soundEngine.setEventEnabled(.error, enabled: on) }
+            .store(in: &cancellables)
+        settingsStore.$soundPermission
+            .sink { [weak self] on in
+                self?.soundEngine.setEventEnabled(.approvalNeeded, enabled: on)
+                self?.soundEngine.setEventEnabled(.approvalGranted, enabled: on)
+                self?.soundEngine.setEventEnabled(.approvalDenied, enabled: on)
+            }
+            .store(in: &cancellables)
+
+        // Create notch window
+        notchWindowController = NotchWindowController(
+            sessionStore: sessionStore,
+            settingsStore: settingsStore,
+            rateLimitStore: rateLimitStore
+        )
+        notchWindowController?.showWindow(nil)
+        let screen = ScreenDetector.notchScreen
+        log("Notch window shown, frame: \(notchWindowController?.window?.frame ?? .zero)")
+        log("Screen frame: \(screen.frame)")
+        log("Screen visibleFrame: \(screen.visibleFrame)")
+        log("SafeAreaInsets: top=\(screen.safeAreaInsets.top) bottom=\(screen.safeAreaInsets.bottom)")
+        log("Notch height: \(ScreenDetector.notchHeight), hasNotch: \(ScreenDetector.hasNotch)")
+        log("Window level: \(notchWindowController?.window?.level.rawValue ?? -1)")
+
+        // Menu bar
+        menuBarManager = MenuBarManager(
+            settingsStore: settingsStore,
+            sessionStore: sessionStore,
+            onQuit: { NSApp.terminate(nil) }
+        )
+
+        // Start socket server
+        socketServer.start()
+        log("Socket server started")
+
+        // Setup directories
+        setupDirectories()
+
+        // Show onboarding on first launch
+        if !settingsStore.hasCompletedOnboarding {
+            showOnboarding()
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        socketServer.stop()
+        cleanupPidFile()
+    }
+
+    private func setupDirectories() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let dirs = [
+            home.appendingPathComponent(".code-island/bin"),
+            home.appendingPathComponent(".code-island/run"),
+            home.appendingPathComponent(".code-island/cache"),
+            home.appendingPathComponent(".code-island/sound-packs"),
+        ]
+        for dir in dirs {
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        // Write PID
+        let pidFile = home.appendingPathComponent(".code-island/run/code-island.pid")
+        try? "\(ProcessInfo.processInfo.processIdentifier)".write(to: pidFile, atomically: true, encoding: .utf8)
+    }
+
+    private func showOnboarding() {
+        onboardingController = OnboardingWindowController(
+            settingsStore: settingsStore,
+            onComplete: { [weak self] in
+                self?.onboardingController = nil
+            }
+        )
+        onboardingController?.showWindow(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func cleanupPidFile() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let pidFile = home.appendingPathComponent(".code-island/run/code-island.pid")
+        try? FileManager.default.removeItem(at: pidFile)
+    }
+}
