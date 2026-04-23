@@ -1,21 +1,45 @@
-MIT License
+Code Island License
+Copyright (c) 2026 Rifqi Akram
 
-Copyright (c) 2026 Code Island contributors
+Permission is hereby granted to any individual obtaining a copy of this software
+and associated documentation files (the "Software") to use the Software solely
+for personal, non-commercial purposes, subject to the following conditions:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. NON-COMMERCIAL USE ONLY
+   You may use the Software only for personal, non-commercial purposes. Any use
+   of the Software, in whole or in part, for commercial purposes — including but
+   not limited to selling, licensing, renting, or using the Software (or any
+   derivative) as part of a paid product or service — is strictly prohibited
+   without prior written permission from the copyright holder.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. NO REDISTRIBUTION
+   You may not distribute, republish, sublicense, host, mirror, or otherwise
+   make the Software (or any modified version or derivative work) available to
+   any third party. This includes, without limitation, posting the Software on
+   public websites, app stores, file-sharing services, or code-hosting platforms
+   under your own name.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+3. NO DERIVATIVE DISTRIBUTION
+   You may modify the Software for your own personal, non-commercial use, but
+   you may not distribute such modifications to anyone else.
+
+4. CONTRIBUTIONS
+   If you submit a pull request or patch to the upstream repository owned by the
+   copyright holder, you grant the copyright holder a perpetual, worldwide,
+   royalty-free license to use, modify, and incorporate your contribution into
+   the Software under the terms of this license.
+
+5. ATTRIBUTION
+   The copyright notice and this license must be included in any copy of the
+   Software you retain for personal use.
+
+6. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+   FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+For commercial licensing inquiries, please contact the copyright holder.

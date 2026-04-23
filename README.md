@@ -98,7 +98,9 @@ PRs welcome! Areas that could use work:
 
 ## License
 
-MIT
+**Personal, non-commercial use only. No redistribution.** See [LICENSE](LICENSE) for full terms.
+
+For commercial licensing, please contact the copyright holder.
 
 ## Credits
 
