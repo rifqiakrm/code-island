@@ -32,7 +32,8 @@ struct NotchContentView: View {
                     // Check for pending permissions/questions first
                     let store = sessionStore
                     if let pending = store.nextPendingPermission() {
-                        viewModel.showPermission(sessionId: pending)
+                        let h = store.sessions[pending].map { NotchViewModel.permissionHeight(for: $0) }
+                        viewModel.showPermission(sessionId: pending, contentHeight: h)
                     } else if let pending = store.nextPendingQuestion() {
                         viewModel.showQuestion(sessionId: pending)
                     } else {
@@ -62,33 +63,13 @@ struct NotchContentView: View {
 
         case .finished(let sessionId):
             if let session = sessionStore.sessions[sessionId] {
-                VStack(spacing: 0) {
-                    HStack {
-                        RateLimitBar(rateLimitStore: rateLimitStore)
-                        Spacer()
-                    }
-                    .padding(.top, 8)
-                    .padding(.horizontal, 10)
-
-                    SessionCardView(session: session, onDone: {
-                        viewModel.collapse()
-                    })
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-
-                    Divider()
-                        .background(Color.white.opacity(0.1))
-
-                    Button(action: { viewModel.expand() }) {
-                        Text("Show all \(sessionStore.sessions.count) sessions")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.4))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
+                FinishedView(
+                    session: session,
+                    onDismiss: { viewModel.collapse() },
+                    rateLimitStore: rateLimitStore,
+                    settingsStore: settingsStore,
+                    onOpenSettings: onOpenSettings
+                )
             } else {
                 CollapsedNotchView(sessionStore: sessionStore, rateLimitStore: rateLimitStore)
             }
@@ -103,14 +84,17 @@ struct NotchContentView: View {
                         onPermissionRespond(sessionId, action)
                         let store = sessionStore
                         if let next = store.nextPendingPermission() {
-                            viewModel.showPermission(sessionId: next)
+                            let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
+                            viewModel.showPermission(sessionId: next, contentHeight: h)
                         } else if let next = store.nextPendingQuestion() {
                             viewModel.showQuestion(sessionId: next)
                         } else {
                             viewModel.dismissPermission()
                         }
                     },
-                    rateLimitStore: rateLimitStore
+                    rateLimitStore: rateLimitStore,
+                    settingsStore: settingsStore,
+                    onOpenSettings: onOpenSettings
                 )
             } else {
                 CollapsedNotchView(sessionStore: sessionStore, rateLimitStore: rateLimitStore)
@@ -126,14 +110,29 @@ struct NotchContentView: View {
                         sessionStore.respondToQuestion(sessionId: sessionId, answer: answers)
                         let store = sessionStore
                         if let next = store.nextPendingPermission() {
-                            viewModel.showPermission(sessionId: next)
+                            let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
+                            viewModel.showPermission(sessionId: next, contentHeight: h)
                         } else if let next = store.nextPendingQuestion() {
                             viewModel.showQuestion(sessionId: next)
                         } else {
                             viewModel.dismissQuestion()
                         }
                     },
-                    rateLimitStore: rateLimitStore
+                    onDeferToTerminal: {
+                        sessionStore.deferQuestionToTerminal(sessionId: sessionId)
+                        let store = sessionStore
+                        if let next = store.nextPendingPermission() {
+                            let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
+                            viewModel.showPermission(sessionId: next, contentHeight: h)
+                        } else if let next = store.nextPendingQuestion() {
+                            viewModel.showQuestion(sessionId: next)
+                        } else {
+                            viewModel.dismissQuestion()
+                        }
+                    },
+                    rateLimitStore: rateLimitStore,
+                    settingsStore: settingsStore,
+                    onOpenSettings: onOpenSettings
                 )
             } else {
                 CollapsedNotchView(sessionStore: sessionStore, rateLimitStore: rateLimitStore)

@@ -79,13 +79,32 @@ final class NotchWindowController: NSWindowController {
         Task { @MainActor in
             switch event {
             case .permissionRequested(let sessionId):
-                viewModel.showPermission(sessionId: sessionId)
+                let height = computePermissionHeight(sessionId: sessionId)
+                viewModel.showPermission(sessionId: sessionId, contentHeight: height)
             case .questionAsked(let sessionId):
                 viewModel.showQuestion(sessionId: sessionId)
             case .statusChanged(let sessionId, let status) where status == .idle:
                 // Claude finished — show focused notification card
                 if !viewModel.isExpanded {
-                    viewModel.showFinished(sessionId: sessionId)
+                    let height = computeFinishedHeight(sessionId: sessionId)
+                    viewModel.showFinished(sessionId: sessionId, contentHeight: height)
+                }
+            case .pendingDismissedExternally(let sessionId):
+                // Permission/question was answered in the terminal — dismiss the notch
+                switch viewModel.state {
+                case .permission(let id) where id == sessionId,
+                     .question(let id) where id == sessionId:
+                    // Show next pending if any, else collapse
+                    if let next = sessionStore.nextPendingPermission() {
+                        let h = sessionStore.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
+                        viewModel.showPermission(sessionId: next, contentHeight: h)
+                    } else if let next = sessionStore.nextPendingQuestion() {
+                        viewModel.showQuestion(sessionId: next)
+                    } else {
+                        viewModel.collapse()
+                    }
+                default:
+                    break
                 }
             default:
                 break
@@ -97,5 +116,34 @@ final class NotchWindowController: NSWindowController {
         guard let panel = window else { return }
         let newFrame = ScreenDetector.notchPanelFrame(panelSize: viewModel.currentSize)
         panel.setFrame(newFrame, display: true, animate: true)
+    }
+
+    private func computePermissionHeight(sessionId: String) -> CGFloat {
+        guard let session = sessionStore.sessions[sessionId],
+              let pending = session.pendingPermission else {
+            return NotchViewModel.permissionSize.height
+        }
+        let filePath = pending.filePath
+        var contentLines: Int? = nil
+        if let oldStr = pending.oldString, let newStr = pending.newString {
+            contentLines = oldStr.components(separatedBy: "\n").count + newStr.components(separatedBy: "\n").count
+        } else if let content = pending.content, !content.isEmpty {
+            contentLines = content.components(separatedBy: "\n").count
+        }
+        let hasDescription = (pending.description?.isEmpty == false) && filePath == nil
+        return NotchViewModel.computePermissionHeight(
+            filePath: filePath,
+            contentLines: contentLines,
+            hasDescription: hasDescription
+        )
+    }
+
+    private func computeFinishedHeight(sessionId: String) -> CGFloat {
+        guard let session = sessionStore.sessions[sessionId] else {
+            return NotchViewModel.finishedSize.height
+        }
+        let hasUser = session.lastUserMessage != nil
+        let replyLines = session.lastAssistantMessage?.components(separatedBy: "\n").count ?? 0
+        return NotchViewModel.computeFinishedHeight(hasUser: hasUser, replyLines: replyLines)
     }
 }

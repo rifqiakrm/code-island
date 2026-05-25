@@ -29,3 +29,4 @@ design/*.pen
 # Environment
 .env
 .env.local
+design.pen

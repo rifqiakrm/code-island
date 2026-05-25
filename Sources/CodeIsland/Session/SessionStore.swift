@@ -10,6 +10,7 @@ enum SessionEvent {
     case permissionRequested(String)
     case permissionResponded(String, Bool)
     case questionAsked(String)
+    case pendingDismissedExternally(String)
     case notification(String, String)
 }
 
@@ -43,6 +44,28 @@ final class SessionStore: ObservableObject {
     func handleMessage(_ message: BridgeMessage, respond: ((BridgeResponse) -> Void)?, respondRaw: ((Data) -> Void)? = nil) {
         let sessionId = message.sessionId
         ensureSession(message)
+
+        // Always update effort level if present (it's on most hooks)
+        if let effort = message.effortLevel {
+            sessions[sessionId]?.effortLevel = effort
+        }
+        // Always update session title if present
+        if let title = message.sessionTitle, !title.isEmpty {
+            sessions[sessionId]?.sessionTitle = title
+        }
+
+        // If a new event arrives while a permission/question is still pending,
+        // the user must have answered it via the terminal — dismiss the notch.
+        let isProgressEvent = ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"].contains(message.hookEvent)
+        if isProgressEvent {
+            let hadPending = (sessions[sessionId]?.pendingPermission != nil) || (sessions[sessionId]?.pendingQuestion != nil)
+            if hadPending {
+                sessions[sessionId]?.pendingPermission = nil
+                sessions[sessionId]?.pendingQuestion = nil
+                Log.info("Pending resolved externally for session=\(sessionId.prefix(8)) (event=\(message.hookEvent))")
+                onEvent.send(.pendingDismissedExternally(sessionId))
+            }
+        }
 
         switch message.hookEvent {
         case "SessionStart":
@@ -79,6 +102,7 @@ final class SessionStore: ObservableObject {
             let toolName = message.toolName ?? "unknown"
             sessions[sessionId]?.status = .thinking
             sessions[sessionId]?.currentTool = nil
+            sessions[sessionId]?.lastToolDurationMs = message.durationMs
             // Don't update lastAssistantMessage from tool output
             onEvent.send(.toolEnded(sessionId, toolName))
 
@@ -112,6 +136,10 @@ final class SessionStore: ObservableObject {
                 sessions[sessionId]?.pendingPermission = PendingPermission(
                     toolName: toolName,
                     description: description,
+                    filePath: message.toolFilePath,
+                    content: message.toolContent,
+                    oldString: message.toolOldString,
+                    newString: message.toolNewString,
                     respond: { action in
                         Log.info("Permission responded: \(action) for session=\(sessionId.prefix(8)), respondRaw=\(respondRaw != nil)")
                         // State is already cleared by respondToPermission() synchronously
@@ -221,6 +249,20 @@ final class SessionStore: ObservableObject {
     /// Returns the session ID of the next session with a pending question, if any.
     func nextPendingQuestion() -> String? {
         sessions.first(where: { $0.value.pendingQuestion != nil })?.key
+    }
+
+    /// Defer the pending question to the terminal (Claude Code will prompt there).
+    func deferQuestionToTerminal(sessionId: String) {
+        guard let q = sessions[sessionId]?.pendingQuestion else { return }
+        sessions[sessionId]?.pendingQuestion = nil
+        sessions[sessionId]?.status = .thinking
+        if let data = BridgeResponse.deferToTerminal() {
+            q.respond(data)
+        }
+        // Jump to the terminal so the user can answer there
+        if let session = sessions[sessionId] {
+            TerminalJumper.jump(to: session)
+        }
     }
 
     /// Called from QuestionView with answers formatted as "answer1|answer2|..."

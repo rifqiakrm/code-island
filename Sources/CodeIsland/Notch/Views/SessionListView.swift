@@ -27,10 +27,10 @@ struct SessionListView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 6)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
             if sessionStore.activeSessions.isEmpty {
-                // Empty state
                 Spacer()
                 VStack(spacing: 8) {
                     Image(systemName: "moon.zzz")
@@ -45,26 +45,19 @@ struct SessionListView: View {
                 }
                 Spacer()
             } else {
-                // Session cards
                 ScrollView {
                     VStack(spacing: 6) {
                         ForEach(
                             sessionStore.activeSessions.values.sorted(by: { $0.startedAt > $1.startedAt }),
                             id: \.id
                         ) { session in
-                            // Show permission view inline for sessions needing approval
-                            if session.pendingPermission != nil {
-                                SessionCardView(session: session)
-                            } else {
-                                SessionCardView(session: session)
-                            }
+                            SessionCardView(session: session)
                         }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                 }
 
-                // Footer: "Show all N sessions"
                 Divider()
                     .background(Color.white.opacity(0.1))
 

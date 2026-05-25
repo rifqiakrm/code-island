@@ -12,6 +12,13 @@ struct BridgeMessage: Codable {
     let userMessage: String?
     let assistantMessage: String?
     let permissionMode: String?
+    let effortLevel: String?
+    let durationMs: Int?
+    let toolFilePath: String?
+    let toolContent: String?
+    let toolOldString: String?
+    let toolNewString: String?
+    let sessionTitle: String?
 
     var terminalInfo: TerminalInfo? {
         guard let env else { return nil }
@@ -37,6 +44,13 @@ struct BridgeMessage: Codable {
         case userMessage = "user_message"
         case assistantMessage = "assistant_message"
         case permissionMode = "permission_mode"
+        case effortLevel = "effort_level"
+        case durationMs = "duration_ms"
+        case toolFilePath = "tool_file_path"
+        case toolContent = "tool_content"
+        case toolOldString = "tool_old_string"
+        case toolNewString = "tool_new_string"
+        case sessionTitle = "session_title"
     }
 }
 
@@ -87,6 +101,20 @@ struct BridgeResponse: Codable {
                             "destination": "session",
                         ] as [String: Any],
                     ],
+                ] as [String: Any],
+            ] as [String: Any],
+        ]
+        return try? JSONSerialization.data(withJSONObject: response)
+    }
+
+    /// Defer to terminal — Claude Code will fall back to its default prompt in the terminal.
+    /// Used when user clicks "Answer in terminal" on a question.
+    static func deferToTerminal() -> Data? {
+        let response: [String: Any] = [
+            "hookSpecificOutput": [
+                "hookEventName": "PermissionRequest",
+                "decision": [
+                    "behavior": "ask",
                 ] as [String: Any],
             ] as [String: Any],
         ]

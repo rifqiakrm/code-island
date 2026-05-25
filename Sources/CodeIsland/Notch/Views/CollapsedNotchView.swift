@@ -10,7 +10,7 @@ struct CollapsedNotchView: View {
                 // Left: mascot
                 if let latest = sessionStore.activeSessions.values
                     .sorted(by: { $0.startedAt > $1.startedAt }).first {
-                    SessionMascot(status: latest.status, size: 1.5)
+                    SessionMascot(status: latest.status, size: 16)
                 }
 
                 Spacer()

@@ -1,93 +1,111 @@
 import SwiftUI
+import Combine
 
-/// 8-bit pixel art Claude Code mascot — matches the official terracotta design.
+/// Claude crab mascot — pixel-art crab with animated walking legs.
 struct PixelMascot: View {
-    var size: CGFloat = 2.0
+    var size: CGFloat = 16
     var palette: MascotPalette = .claude
+    var animateLegs: Bool = false
 
-    // 13x11 pixel grid — exact Claude Code mascot from official generator
-    // B = body (1), D = dark eyes (2), . = transparent (0)
-    static let pixels: [[Int]] = [
-        [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-        [0, 0, 1, 1, 2, 1, 1, 1, 2, 1, 1, 0, 0],
-        [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-        [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0],
-        [0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0],
-    ]
+    @State private var legPhase: Int = 0
+    private let legTimer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
 
     enum MascotPalette {
         case claude    // Terracotta/salmon (default)
         case thinking  // Cyan
         case idle      // Green
         case error     // Red
+        case waiting   // Orange
 
         var body: Color {
             switch self {
-            case .claude: return Color(red: 0.83, green: 0.51, blue: 0.42)  // exact terracotta
+            case .claude: return Color(red: 0.85, green: 0.47, blue: 0.34)
             case .thinking: return Color(red: 0.30, green: 0.75, blue: 0.90)
             case .idle: return Color(red: 0.45, green: 0.78, blue: 0.45)
             case .error: return Color(red: 0.90, green: 0.35, blue: 0.30)
+            case .waiting: return Color(red: 1.0, green: 0.72, blue: 0.30)
             }
         }
 
-        var eyes: Color {
-            switch self {
-            case .claude: return Color(red: 0.18, green: 0.13, blue: 0.10)
-            case .thinking: return Color(red: 0.08, green: 0.25, blue: 0.35)
-            case .idle: return Color(red: 0.10, green: 0.25, blue: 0.12)
-            case .error: return Color(red: 0.30, green: 0.08, blue: 0.08)
-            }
-        }
+        var eyes: Color { .black }
     }
 
     var body: some View {
-        Canvas { context, _ in
-            for (row, cols) in Self.pixels.enumerated() {
-                for (col, pixel) in cols.enumerated() {
-                    guard pixel > 0 else { continue }
-                    let color = pixel == 2 ? palette.eyes : palette.body
-                    let rect = CGRect(
-                        x: CGFloat(col) * size,
-                        y: CGFloat(row) * size,
-                        width: size,
-                        height: size
-                    )
-                    context.fill(Path(rect), with: .color(color))
-                }
+        Canvas { context, canvasSize in
+            let scale = size / 52.0
+            let xOffset = (canvasSize.width - 66 * scale) / 2
+
+            // Left antenna
+            let leftAntenna = Path { p in
+                p.addRect(CGRect(x: 0, y: 13, width: 6, height: 13))
+            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
+            context.fill(leftAntenna, with: .color(palette.body))
+
+            // Right antenna
+            let rightAntenna = Path { p in
+                p.addRect(CGRect(x: 60, y: 13, width: 6, height: 13))
+            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
+            context.fill(rightAntenna, with: .color(palette.body))
+
+            // Animated legs
+            let baseLegPositions: [CGFloat] = [6, 18, 42, 54]
+            let baseLegHeight: CGFloat = 13
+            let legHeightOffsets: [[CGFloat]] = [
+                [3, -3, 3, -3],
+                [0, 0, 0, 0],
+                [-3, 3, -3, 3],
+                [0, 0, 0, 0],
+            ]
+            let currentHeightOffsets = animateLegs ? legHeightOffsets[legPhase % 4] : [CGFloat](repeating: 0, count: 4)
+
+            for (index, xPos) in baseLegPositions.enumerated() {
+                let heightOffset = currentHeightOffsets[index]
+                let legHeight = baseLegHeight + heightOffset
+                let leg = Path { p in
+                    p.addRect(CGRect(x: xPos, y: 39, width: 6, height: legHeight))
+                }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
+                context.fill(leg, with: .color(palette.body))
+            }
+
+            // Main body
+            let body = Path { p in
+                p.addRect(CGRect(x: 6, y: 0, width: 54, height: 39))
+            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
+            context.fill(body, with: .color(palette.body))
+
+            // Left eye
+            let leftEye = Path { p in
+                p.addRect(CGRect(x: 12, y: 13, width: 6, height: 6.5))
+            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
+            context.fill(leftEye, with: .color(palette.eyes))
+
+            // Right eye
+            let rightEye = Path { p in
+                p.addRect(CGRect(x: 48, y: 13, width: 6, height: 6.5))
+            }.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0))
+            context.fill(rightEye, with: .color(palette.eyes))
+        }
+        .frame(width: size * (66.0 / 52.0), height: size)
+        .onReceive(legTimer) { _ in
+            if animateLegs {
+                legPhase = (legPhase + 1) % 4
             }
         }
-        .frame(
-            width: CGFloat(Self.pixels[0].count) * size,
-            height: CGFloat(Self.pixels.count) * size
-        )
     }
 }
 
 /// Animated mascot that picks palette based on session status
 struct SessionMascot: View {
     let status: SessionStatus
-    var size: CGFloat = 2.0
+    var size: CGFloat = 16
     var animated: Bool = true
 
-    @State private var bounce = false
-
     var body: some View {
-        PixelMascot(size: size, palette: paletteFor(status))
-            .offset(y: animated && isActive ? (bounce ? -1.5 : 1.5) : 0)
-            .scaleEffect(animated && isActive ? (bounce ? 1.05 : 0.95) : 1.0)
-            .animation(
-                isActive ? .easeInOut(duration: 0.6).repeatForever(autoreverses: true) : .default,
-                value: bounce
-            )
-            .onAppear {
-                if isActive { bounce = true }
-            }
-            .onChange(of: status) { _, newStatus in
-                bounce = newStatus == .thinking || newStatus == .toolUse
-            }
+        PixelMascot(
+            size: size,
+            palette: paletteFor(status),
+            animateLegs: animated && isActive
+        )
     }
 
     private var isActive: Bool {
@@ -99,7 +117,7 @@ struct SessionMascot: View {
         case .thinking, .toolUse: return .thinking
         case .idle, .completed: return .claude
         case .error: return .error
-        case .waitingPermission: return .claude
+        case .waitingPermission: return .waiting
         }
     }
 }

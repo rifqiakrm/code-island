@@ -30,23 +30,41 @@ let cwd = payload["cwd"] as? String
 // Extract tool name
 let toolName = payload["tool_name"] as? String
 
-// Extract tool input as a string summary
+// Extract tool input as a string summary, plus separate content/path for Write/Edit
 var toolInputStr: String? = nil
+var toolContent: String? = nil
+var toolFilePath: String? = nil
+var toolOldString: String? = nil
+var toolNewString: String? = nil
 if let toolInput = payload["tool_input"] as? [String: Any] {
     if let cmd = toolInput["command"] as? String {
         toolInputStr = cmd
     } else if let fp = toolInput["file_path"] as? String {
         toolInputStr = fp
+        toolFilePath = fp
+    } else if let url = toolInput["url"] as? String {
+        toolInputStr = url
+        toolFilePath = url
+        // For WebFetch: combine url and prompt
+        if let prompt = toolInput["prompt"] as? String {
+            toolContent = prompt
+        }
     } else if let pattern = toolInput["pattern"] as? String {
         toolInputStr = pattern
+        toolFilePath = pattern
     } else if let desc = toolInput["description"] as? String {
         toolInputStr = desc
     } else {
-        // Serialize the whole thing compactly
         if let data = try? JSONSerialization.data(withJSONObject: toolInput, options: []) {
             toolInputStr = String(data: data, encoding: .utf8)
         }
     }
+    // Extract content/edits for Write/Edit tools (only if not already set by WebFetch)
+    if toolContent == nil {
+        toolContent = toolInput["content"] as? String
+    }
+    toolOldString = toolInput["old_string"] as? String
+    toolNewString = toolInput["new_string"] as? String
 } else if let toolInput = payload["tool_input"] as? String {
     toolInputStr = toolInput
 }
@@ -148,10 +166,21 @@ var message: [String: Any] = [
 if let cwd { message["cwd"] = cwd }
 if let toolName { message["tool_name"] = toolName }
 if let toolInputStr { message["tool_input"] = toolInputStr }
+if let toolFilePath { message["tool_file_path"] = toolFilePath }
+if let toolContent { message["tool_content"] = toolContent }
+if let toolOldString { message["tool_old_string"] = toolOldString }
+if let toolNewString { message["tool_new_string"] = toolNewString }
 if !envVars.isEmpty { message["_env"] = envVars }
 if let userMessage { message["user_message"] = userMessage }
 if let assistantMessage { message["assistant_message"] = assistantMessage }
 if let permMode = payload["permission_mode"] as? String { message["permission_mode"] = permMode }
+if let sessionTitle = payload["session_title"] as? String, !sessionTitle.isEmpty {
+    message["session_title"] = sessionTitle
+}
+if let effort = payload["effort"] as? [String: Any], let level = effort["level"] as? String {
+    message["effort_level"] = level
+}
+if let durationMs = payload["duration_ms"] as? Int { message["duration_ms"] = durationMs }
 
 // Serialize
 guard let messageData = try? JSONSerialization.data(withJSONObject: message) else { exit(1) }

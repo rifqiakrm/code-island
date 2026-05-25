@@ -24,12 +24,16 @@ final class NotchViewModel: ObservableObject {
     // Expanded: compact, fits ~3 session cards
     static let expandedSize = NSSize(width: 520, height: 320)
     // Permission: wide enough for details
-    static let permissionSize = NSSize(width: 520, height: 300)
+    static let permissionSize = NSSize(width: 520, height: 380)
     // Question: taller for multiple questions
-    static let questionSize = NSSize(width: 520, height: 420)
+    static let questionSize = NSSize(width: 520, height: 480)
 
     // Finished notification: compact, just one card
-    static let finishedSize = NSSize(width: 520, height: 200)
+    static let finishedSize = NSSize(width: 520, height: 380)
+
+    // Dynamic content height — set when showing permission/finished based on actual content
+    @Published var dynamicPermissionHeight: CGFloat? = nil
+    @Published var dynamicFinishedHeight: CGFloat? = nil
 
     var currentSize: NSSize {
         switch state {
@@ -38,12 +42,63 @@ final class NotchViewModel: ObservableObject {
         case .expanded:
             return Self.expandedSize
         case .finished:
-            return Self.finishedSize
+            return NSSize(width: 520, height: dynamicFinishedHeight ?? Self.finishedSize.height)
         case .permission:
-            return Self.permissionSize
+            return NSSize(width: 520, height: dynamicPermissionHeight ?? Self.permissionSize.height)
         case .question:
             return Self.questionSize
         }
+    }
+
+    /// Compute the height needed for a permission view with the given content.
+    static func computePermissionHeight(filePath: String?, contentLines: Int?, hasDescription: Bool) -> CGFloat {
+        var h: CGFloat = 0
+        h += 10 + 14   // top bar (rate limits/sound/gear) + spacing
+        h += 12 + 22 + 10 // session header (mascot+title+badge) + spacing
+        h += 22 + 10    // tool pill + subtitle row + spacing
+        if filePath != nil {
+            h += 30 + 8 // path row + spacing
+        }
+        if let lines = contentLines, lines > 0 {
+            let bodyHeight = min(CGFloat(lines) * 14 + 20, 240)
+            h += 24 + bodyHeight + 0 // content header + body
+        } else if hasDescription {
+            h += 24 + 50
+        }
+        h += 12 + 36 + 12 // spacer + buttons + bottom padding
+        return min(max(h, 200), 520)
+    }
+
+    static func permissionHeight(for session: Session) -> CGFloat {
+        guard let pending = session.pendingPermission else { return permissionSize.height }
+        var contentLines: Int? = nil
+        if let oldStr = pending.oldString, let newStr = pending.newString {
+            contentLines = oldStr.components(separatedBy: "\n").count + newStr.components(separatedBy: "\n").count
+        } else if let content = pending.content, !content.isEmpty {
+            contentLines = content.components(separatedBy: "\n").count
+        }
+        let hasDescription = (pending.description?.isEmpty == false) && pending.filePath == nil
+        return computePermissionHeight(
+            filePath: pending.filePath,
+            contentLines: contentLines,
+            hasDescription: hasDescription
+        )
+    }
+
+    static func computeFinishedHeight(hasUser: Bool, replyLines: Int) -> CGFloat {
+        var h: CGFloat = 0
+        h += 10 + 14   // top bar
+        h += 12 + 22 + 10 // session header
+        h += 22 + 10    // tool pill (Done) row
+        if hasUser {
+            h += 30 + 8 // user row
+        }
+        if replyLines > 0 {
+            let bodyHeight = min(CGFloat(replyLines) * 14 + 20, 260)
+            h += 24 + bodyHeight
+        }
+        h += 12 + 36 + 12 // spacer + dismiss + bottom padding
+        return min(max(h, 200), 520)
     }
 
     var isExpanded: Bool {
@@ -73,14 +128,16 @@ final class NotchViewModel: ObservableObject {
         }
     }
 
-    func showFinished(sessionId: String) {
+    func showFinished(sessionId: String, contentHeight: CGFloat? = nil) {
         autoCollapseTask?.cancel()
+        dynamicFinishedHeight = contentHeight
         state = .finished(sessionId: sessionId)
         scheduleAutoCollapse(delay: 3.0)
     }
 
-    func showPermission(sessionId: String) {
+    func showPermission(sessionId: String, contentHeight: CGFloat? = nil) {
         autoCollapseTask?.cancel()
+        dynamicPermissionHeight = contentHeight
         state = .permission(sessionId: sessionId)
     }
 

@@ -30,6 +30,10 @@ enum PermissionAction {
 struct PendingPermission {
     let toolName: String
     let description: String?
+    let filePath: String?
+    let content: String?
+    let oldString: String?
+    let newString: String?
     let respond: (PermissionAction) -> Void
 }
 
@@ -66,9 +70,18 @@ struct Session: Identifiable {
     var lastUserMessage: String?
     var lastAssistantMessage: String?
     var terminalApp: String?
+    var effortLevel: String?
+    var lastToolDurationMs: Int?
+    var sessionTitle: String?
 
     var projectName: String {
         (cwd as NSString).lastPathComponent
+    }
+
+    /// Preferred display name — uses Claude's session title if set, else falls back to folder name.
+    var displayName: String {
+        if let title = sessionTitle, !title.isEmpty { return title }
+        return projectName
     }
 
     var durationText: String {
