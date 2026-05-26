@@ -112,10 +112,44 @@ final class NotchWindowController: NSWindowController {
         }
     }
 
+    private var animationTimer: Timer?
+
     private func repositionWindow() {
         guard let panel = window else { return }
-        let newFrame = ScreenDetector.notchPanelFrame(panelSize: viewModel.currentSize)
-        panel.setFrame(newFrame, display: true, animate: true)
+        animatePanelToSize(viewModel.currentSize, duration: 0.32)
+        _ = panel
+    }
+
+    /// Manual frame animation that keeps the TOP edge glued to the screen top
+    /// while interpolating width and height. Bottom and sides expand from the
+    /// notch outward — same as Vibe Island's resize behavior.
+    private func animatePanelToSize(_ targetSize: NSSize, duration: TimeInterval) {
+        guard let panel = window else { return }
+        animationTimer?.invalidate()
+        let screen = ScreenDetector.notchScreen.frame
+        let startSize = panel.frame.size
+        let startTime = CACurrentMediaTime()
+        let dw = targetSize.width - startSize.width
+        let dh = targetSize.height - startSize.height
+        if abs(dw) < 0.5 && abs(dh) < 0.5 { return }
+
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            let elapsed = CACurrentMediaTime() - startTime
+            let t = min(elapsed / duration, 1.0)
+            // Smooth ease-out cubic — fast start, gentle settle
+            let eased = 1.0 - pow(1.0 - t, 3.0)
+            let w = startSize.width + dw * eased
+            let h = startSize.height + dh * eased
+            // Always anchor TOP edge to screen top, expand width from center
+            let x = screen.midX - w / 2
+            let y = screen.maxY - h
+            self.window?.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
+            if t >= 1.0 {
+                timer.invalidate()
+                self.animationTimer = nil
+            }
+        }
     }
 
     private func computePermissionHeight(sessionId: String) -> CGFloat {

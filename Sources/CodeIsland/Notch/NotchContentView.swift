@@ -18,13 +18,9 @@ struct NotchContentView: View {
             content
                 .clipped()
         }
-        .frame(
-            width: viewModel.currentSize.width,
-            height: viewModel.currentSize.height
-        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(NotchShape(cornerRadius: viewModel.isExpanded ? 20 : 14))
         .shadow(color: .black.opacity(0.4), radius: viewModel.isExpanded ? 16 : 6, y: 4)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: viewModel.state)
         .onHover { hovering in
             if hovering {
                 viewModel.mouseEntered()
