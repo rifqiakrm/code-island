@@ -64,7 +64,17 @@ struct NotchContentView: View {
                     onDismiss: { viewModel.collapse() },
                     rateLimitStore: rateLimitStore,
                     settingsStore: settingsStore,
-                    onOpenSettings: onOpenSettings
+                    onOpenSettings: onOpenSettings,
+                    onToggleExpand: { expanded in
+                        if expanded {
+                            viewModel.cancelAutoCollapse()
+                            viewModel.dynamicFinishedHeight = 560
+                        } else {
+                            let hasUser = session.lastUserMessage != nil
+                            let replyLines = session.lastAssistantMessage.map { NotchViewModel.estimateVisualLinesPublic($0) } ?? 0
+                            viewModel.dynamicFinishedHeight = NotchViewModel.computeFinishedHeight(hasUser: hasUser, replyLines: replyLines)
+                        }
+                    }
                 )
             } else {
                 CollapsedNotchView(sessionStore: sessionStore, rateLimitStore: rateLimitStore)
@@ -90,7 +100,15 @@ struct NotchContentView: View {
                     },
                     rateLimitStore: rateLimitStore,
                     settingsStore: settingsStore,
-                    onOpenSettings: onOpenSettings
+                    onOpenSettings: onOpenSettings,
+                    onToggleExpand: { expanded in
+                        // Expanded mode = give the window enough room for the bigger ScrollView
+                        if expanded {
+                            viewModel.dynamicPermissionHeight = 560
+                        } else if let s = sessionStore.sessions[sessionId] {
+                            viewModel.dynamicPermissionHeight = NotchViewModel.permissionHeight(for: s)
+                        }
+                    }
                 )
             } else {
                 CollapsedNotchView(sessionStore: sessionStore, rateLimitStore: rateLimitStore)

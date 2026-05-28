@@ -7,6 +7,9 @@ struct PermissionView: View {
     @ObservedObject var rateLimitStore: RateLimitStore
     @ObservedObject var settingsStore: SettingsStore
     let onOpenSettings: () -> Void
+    let onToggleExpand: (Bool) -> Void
+
+    @State private var isExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -130,6 +133,16 @@ struct PermissionView: View {
                         Text(preview.metric)
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(.white.opacity(0.4))
+                        Button(action: {
+                            isExpanded.toggle()
+                            onToggleExpand(isExpanded)
+                        }) {
+                            Image(systemName: isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .help(isExpanded ? "Collapse" : "Expand content")
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -145,7 +158,7 @@ struct PermissionView: View {
                             .textSelection(.enabled)
                             .padding(10)
                     }
-                    .frame(maxHeight: 220)
+                    .frame(maxHeight: isExpanded ? 400 : 220)
                     .background(
                         UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8)
                             .fill(.white.opacity(0.05))

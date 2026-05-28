@@ -62,6 +62,15 @@ final class NotchWindowController: NSWindowController {
             }
             .store(in: &cancellables)
 
+        // Reposition when dynamic content height changes (e.g. expand button)
+        Publishers.CombineLatest(viewModel.$dynamicPermissionHeight, viewModel.$dynamicFinishedHeight)
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _, _ in
+                self?.repositionWindow()
+            }
+            .store(in: &cancellables)
+
         // Watch for display changes
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .sink { [weak self] _ in
@@ -162,7 +171,10 @@ final class NotchWindowController: NSWindowController {
         if let oldStr = pending.oldString, let newStr = pending.newString {
             contentLines = oldStr.components(separatedBy: "\n").count + newStr.components(separatedBy: "\n").count
         } else if let content = pending.content, !content.isEmpty {
-            contentLines = content.components(separatedBy: "\n").count
+            contentLines = estimateVisualLines(content)
+        } else if filePath == nil, let desc = pending.description, !desc.isEmpty {
+            // Bash command (or other) — estimate wrapped lines from char width
+            contentLines = estimateVisualLines(desc)
         }
         let hasDescription = (pending.description?.isEmpty == false) && filePath == nil
         return NotchViewModel.computePermissionHeight(
@@ -172,12 +184,23 @@ final class NotchWindowController: NSWindowController {
         )
     }
 
+    /// Estimate the number of rendered lines accounting for wrap at ~62 chars
+    /// (520pt window width minus padding/line numbers, 11pt monospaced font).
+    private func estimateVisualLines(_ text: String) -> Int {
+        let charsPerLine = 62
+        var lines = 0
+        for line in text.components(separatedBy: "\n") {
+            lines += max(1, (line.count + charsPerLine - 1) / charsPerLine)
+        }
+        return lines
+    }
+
     private func computeFinishedHeight(sessionId: String) -> CGFloat {
         guard let session = sessionStore.sessions[sessionId] else {
             return NotchViewModel.finishedSize.height
         }
         let hasUser = session.lastUserMessage != nil
-        let replyLines = session.lastAssistantMessage?.components(separatedBy: "\n").count ?? 0
+        let replyLines = session.lastAssistantMessage.map { estimateVisualLines($0) } ?? 0
         return NotchViewModel.computeFinishedHeight(hasUser: hasUser, replyLines: replyLines)
     }
 }

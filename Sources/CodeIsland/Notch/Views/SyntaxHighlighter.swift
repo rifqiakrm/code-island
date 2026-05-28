@@ -99,40 +99,81 @@ enum SyntaxHighlighter {
     }
 
     /// Build a highlighted attributed string representing an Edit diff (old → new).
+    /// Strips common prefix/suffix lines (unchanged context) so only the actual
+    /// removed/added lines are colored. Context lines appear in neutral plain text.
     /// `startLine` is the line number of the first line in `old` within the source file.
     static func diff(old: String, new: String, theme: Theme = .dark, startLine: Int = 1) -> AttributedString {
         var out = AttributedString("")
         let oldLines = old.components(separatedBy: "\n")
         let newLines = new.components(separatedBy: "\n")
+
+        // Find longest common prefix
+        var prefixCount = 0
+        while prefixCount < oldLines.count, prefixCount < newLines.count,
+              oldLines[prefixCount] == newLines[prefixCount] {
+            prefixCount += 1
+        }
+        // Find longest common suffix (not overlapping with prefix)
+        var suffixCount = 0
+        while suffixCount < (oldLines.count - prefixCount),
+              suffixCount < (newLines.count - prefixCount),
+              oldLines[oldLines.count - 1 - suffixCount] == newLines[newLines.count - 1 - suffixCount] {
+            suffixCount += 1
+        }
+
+        let oldMiddle = Array(oldLines[prefixCount..<(oldLines.count - suffixCount)])
+        let newMiddle = Array(newLines[prefixCount..<(newLines.count - suffixCount)])
+        let prefixLines = Array(oldLines[0..<prefixCount])
+        let suffixLines = Array(oldLines[(oldLines.count - suffixCount)...])
+
         let maxNum = startLine + max(oldLines.count, newLines.count) - 1
         let width = String(maxNum).count
 
-        for (idx, line) in oldLines.enumerated() {
-            let num = String(idx + startLine).leftPad(to: width)
-            var prefix = AttributedString("\(num) ")
-            prefix.foregroundColor = theme.lineNumber
-            out += prefix
-            var marker = AttributedString("-  ")
-            marker.foregroundColor = theme.diffMinus
-            out += marker
-            var s = AttributedString(line + "\n")
-            s.foregroundColor = theme.diffMinus
-            s.backgroundColor = theme.diffMinus.opacity(0.08)
-            out += s
+        // Show context prefix
+        for (idx, line) in prefixLines.enumerated() {
+            out += diffLine(line, number: idx + startLine, width: width,
+                            marker: " ", accentColor: theme.plain, bgOpacity: 0, theme: theme)
         }
-        for (idx, line) in newLines.enumerated() {
-            let num = String(idx + startLine).leftPad(to: width)
-            var prefix = AttributedString("\(num) ")
-            prefix.foregroundColor = theme.lineNumber
-            out += prefix
-            var marker = AttributedString("+  ")
-            marker.foregroundColor = theme.diffPlus
-            out += marker
-            var s = AttributedString(line + "\n")
-            s.foregroundColor = theme.diffPlus
-            s.backgroundColor = theme.diffPlus.opacity(0.08)
-            out += s
+        // Show removed middle
+        for (idx, line) in oldMiddle.enumerated() {
+            out += diffLine(line, number: idx + startLine + prefixCount, width: width,
+                            marker: "-", accentColor: theme.diffMinus, bgOpacity: 0.10, theme: theme)
         }
+        // Show added middle (numbered relative to NEW file)
+        for (idx, line) in newMiddle.enumerated() {
+            out += diffLine(line, number: idx + startLine + prefixCount, width: width,
+                            marker: "+", accentColor: theme.diffPlus, bgOpacity: 0.10, theme: theme)
+        }
+        // Show context suffix (numbered relative to NEW file, after the new middle lines)
+        let suffixStart = startLine + prefixCount + newMiddle.count
+        for (idx, line) in suffixLines.enumerated() {
+            out += diffLine(line, number: idx + suffixStart, width: width,
+                            marker: " ", accentColor: theme.plain, bgOpacity: 0, theme: theme)
+        }
+        return out
+    }
+
+    /// Build a single diff line: syntax-highlighted code with diff bg + prefix.
+    private static func diffLine(_ line: String, number: Int, width: Int, marker: String, accentColor: Color, bgOpacity: Double, theme: Theme) -> AttributedString {
+        var out = AttributedString("")
+
+        // Line number prefix (no bg)
+        let num = String(number).leftPad(to: width)
+        var numPart = AttributedString("\(num) ")
+        numPart.foregroundColor = theme.lineNumber
+        out += numPart
+
+        // Marker (-/+) tinted with accent, no bg
+        var markerPart = AttributedString("\(marker)  ")
+        markerPart.foregroundColor = accentColor
+        out += markerPart
+
+        // Syntax-highlight the line, then apply diff background
+        var lineAttr = highlight(line, theme: theme, withLineNumbers: false)
+        lineAttr.backgroundColor = accentColor.opacity(bgOpacity)
+        out += lineAttr
+
+        out += AttributedString("\n")
         return out
     }
 

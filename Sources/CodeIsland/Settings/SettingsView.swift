@@ -68,7 +68,7 @@ struct SettingsView: View {
             Spacer()
 
             HStack {
-                Text("Code Island v0.8.0")
+                Text("Code Island v0.9.0")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.secondary)
                 Spacer()

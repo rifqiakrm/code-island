@@ -6,6 +6,9 @@ struct FinishedView: View {
     @ObservedObject var rateLimitStore: RateLimitStore
     @ObservedObject var settingsStore: SettingsStore
     let onOpenSettings: () -> Void
+    let onToggleExpand: (Bool) -> Void
+
+    @State private var isExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -129,6 +132,15 @@ struct FinishedView: View {
                         Text(replyMetric(reply))
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundColor(.white.opacity(0.4))
+                        Button(action: {
+                            isExpanded.toggle()
+                            onToggleExpand(isExpanded)
+                        }) {
+                            Image(systemName: isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -145,7 +157,7 @@ struct FinishedView: View {
                             .textSelection(.enabled)
                             .padding(10)
                     }
-                    .frame(maxHeight: 240)
+                    .frame(maxHeight: isExpanded ? 400 : 240)
                     .background(
                         UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8)
                             .fill(.white.opacity(0.05))

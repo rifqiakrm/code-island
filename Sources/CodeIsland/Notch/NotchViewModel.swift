@@ -75,7 +75,9 @@ final class NotchViewModel: ObservableObject {
         if let oldStr = pending.oldString, let newStr = pending.newString {
             contentLines = oldStr.components(separatedBy: "\n").count + newStr.components(separatedBy: "\n").count
         } else if let content = pending.content, !content.isEmpty {
-            contentLines = content.components(separatedBy: "\n").count
+            contentLines = estimateVisualLines(content)
+        } else if pending.filePath == nil, let desc = pending.description, !desc.isEmpty {
+            contentLines = estimateVisualLines(desc)
         }
         let hasDescription = (pending.description?.isEmpty == false) && pending.filePath == nil
         return computePermissionHeight(
@@ -83,6 +85,19 @@ final class NotchViewModel: ObservableObject {
             contentLines: contentLines,
             hasDescription: hasDescription
         )
+    }
+
+    static func estimateVisualLinesPublic(_ text: String) -> Int {
+        estimateVisualLines(text)
+    }
+
+    private static func estimateVisualLines(_ text: String) -> Int {
+        let charsPerLine = 62
+        var lines = 0
+        for line in text.components(separatedBy: "\n") {
+            lines += max(1, (line.count + charsPerLine - 1) / charsPerLine)
+        }
+        return lines
     }
 
     static func computeFinishedHeight(hasUser: Bool, replyLines: Int) -> CGFloat {
@@ -126,6 +141,10 @@ final class NotchViewModel: ObservableObject {
         } else {
             expand()
         }
+    }
+
+    func cancelAutoCollapse() {
+        autoCollapseTask?.cancel()
     }
 
     func showFinished(sessionId: String, contentHeight: CGFloat? = nil) {
