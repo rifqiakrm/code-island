@@ -17,11 +17,19 @@ struct ScreenDetector {
         notchScreen.safeAreaInsets.top
     }
 
-    /// The approximate width of the hardware notch cutout.
+    /// The actual width of the hardware notch cutout, detected from the screen's
+    /// auxiliary top areas (the menu-bar regions on either side of the notch).
+    /// Falls back to a sensible default if the auxiliary areas aren't reported.
     static var notchWidth: CGFloat {
-        // On 14" MacBook Pro the notch is ~180pt wide, 16" is ~186pt.
-        // We use a reasonable default; the panel is wider anyway.
-        180
+        let screen = notchScreen
+        let totalWidth = screen.frame.width
+        let leftWidth = screen.auxiliaryTopLeftArea?.width ?? 0
+        let rightWidth = screen.auxiliaryTopRightArea?.width ?? 0
+        if leftWidth > 0 && rightWidth > 0 {
+            // The gap between the two auxiliary areas IS the notch cutout
+            return max(160, totalWidth - leftWidth - rightWidth)
+        }
+        return 180
     }
 
     /// Frame for centering a notch panel on the target screen.

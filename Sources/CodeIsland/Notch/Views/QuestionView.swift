@@ -24,17 +24,17 @@ struct QuestionView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Top bar: rate limits + controls
             HStack(spacing: 10) {
-                RateLimitBar(rateLimitStore: rateLimitStore)
+                RateLimitBar(rateLimitStore: rateLimitStore, provider: session.provider)
                 Spacer()
                 Button(action: { settingsStore.soundEnabled.toggle() }) {
                     Image(systemName: settingsStore.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: 14))
                         .foregroundColor(.white.opacity(settingsStore.soundEnabled ? 0.6 : 0.3))
                 }
                 .buttonStyle(.plain)
                 Button(action: onOpenSettings) {
                     Image(systemName: "gearshape.fill")
-                        .font(.system(size: 11))
+                        .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.4))
                 }
                 .buttonStyle(.plain)
@@ -45,7 +45,7 @@ struct QuestionView: View {
 
             // Session header + waiting badge
             HStack(spacing: 8) {
-                SessionMascot(status: .waitingPermission, size: 18)
+                SessionMascot(status: .waitingPermission, size: 18, provider: session.provider)
                 Text(session.displayName)
                     .font(.system(size: 13, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)

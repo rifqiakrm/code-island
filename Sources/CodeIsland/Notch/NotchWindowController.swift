@@ -184,10 +184,10 @@ final class NotchWindowController: NSWindowController {
         )
     }
 
-    /// Estimate the number of rendered lines accounting for wrap at ~62 chars
-    /// (520pt window width minus padding/line numbers, 11pt monospaced font).
+    /// Estimate the number of rendered lines accounting for wrap at ~72 chars
+    /// (600pt window width minus padding/line numbers, 11pt monospaced font).
     private func estimateVisualLines(_ text: String) -> Int {
-        let charsPerLine = 62
+        let charsPerLine = 72
         var lines = 0
         for line in text.components(separatedBy: "\n") {
             lines += max(1, (line.count + charsPerLine - 1) / charsPerLine)

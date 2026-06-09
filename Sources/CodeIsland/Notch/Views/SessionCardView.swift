@@ -21,7 +21,7 @@ struct SessionCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Row 1: mascot + title + effort + time
             HStack(spacing: 8) {
-                SessionMascot(status: session.status, size: 18)
+                SessionMascot(status: session.status, size: 18, provider: session.provider)
                 Text(session.displayName)
                     .font(.system(size: 13, weight: .heavy, design: .monospaced))
                     .foregroundColor(.white)
@@ -68,9 +68,9 @@ struct SessionCardView: View {
                     }
                     if let resp = session.lastAssistantMessage {
                         HStack(alignment: .top, spacing: 6) {
-                            Text("CLAUDE")
+                            Text(session.provider.displayName.uppercased())
                                 .font(.system(size: 9, weight: .heavy, design: .monospaced))
-                                .foregroundColor(.green.opacity(0.7))
+                                .foregroundColor(session.provider.accentColor.opacity(0.85))
                                 .kerning(1.2)
                             ScrollView {
                                 Text(resp)
@@ -118,13 +118,17 @@ struct SessionCardView: View {
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(statusAccent)
                 .lineLimit(1)
-            if let durationMs = session.lastToolDurationMs, isActive {
+            if isActive, let started = session.activeStartedAt {
                 Text("·")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.white.opacity(0.3))
-                Text(formatDuration(durationMs))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.55))
+                // TimelineView ticks every 100ms so the elapsed time is live.
+                TimelineView(.periodic(from: .now, by: 0.1)) { ctx in
+                    Text(formatElapsed(ctx.date.timeIntervalSince(started)))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.55))
+                        .monospacedDigit()
+                }
             }
         }
         .padding(.horizontal, 7)
@@ -135,13 +139,23 @@ struct SessionCardView: View {
         )
     }
 
+    private func formatElapsed(_ seconds: TimeInterval) -> String {
+        if seconds < 1.0 {
+            return "\(Int(seconds * 1000))ms"
+        }
+        if seconds < 60 {
+            return String(format: "%.1fs", seconds)
+        }
+        let m = Int(seconds) / 60
+        let s = Int(seconds) % 60
+        return "\(m)m \(s)s"
+    }
+
     @ViewBuilder
     private var statusIcon: some View {
         switch session.status {
         case .thinking, .toolUse:
-            Image(systemName: "sparkle")
-                .font(.system(size: 10))
-                .foregroundColor(statusAccent)
+            AnimatedSparkle(color: statusAccent)
         case .idle, .completed:
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 10))
@@ -184,6 +198,26 @@ struct SessionCardView: View {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(.white.opacity(0.06))
         )
+    }
+}
+
+/// Pulsing/rotating sparkle used as the "thinking" indicator on the session card.
+struct AnimatedSparkle: View {
+    let color: Color
+    @State private var pulse = false
+
+    var body: some View {
+        Image(systemName: "sparkle")
+            .font(.system(size: 10))
+            .foregroundColor(color)
+            .scaleEffect(pulse ? 1.25 : 0.85)
+            .opacity(pulse ? 1.0 : 0.6)
+            .rotationEffect(.degrees(pulse ? 18 : -18))
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    pulse = true
+                }
+            }
     }
 }
 

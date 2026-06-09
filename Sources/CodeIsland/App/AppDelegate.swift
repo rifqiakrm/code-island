@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let soundEngine = SoundEngine()
     private let settingsStore = SettingsStore()
     private let rateLimitStore = RateLimitStore()
+    private let codexAppServer = CodexAppServerClient()
     private var cancellables = Set<AnyCancellable>()
 
     private func log(_ msg: String) {
@@ -96,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarManager = MenuBarManager(
             settingsStore: settingsStore,
             sessionStore: sessionStore,
+            onReloadSounds: { [weak self] in self?.soundEngine.reloadSounds() },
             onQuit: { NSApp.terminate(nil) }
         )
 
@@ -105,6 +107,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Setup directories
         setupDirectories()
+
+        // Auto-install hooks for every supported provider on every launch.
+        // Installers are idempotent and pre-stage Codex config even if the user
+        // doesn't have Codex installed yet, so it "just works" when they add it.
+        Task.detached {
+            _ = HookInstaller.install()
+            _ = CodexInstaller.install()
+        }
+
+        // Subscribe SessionStore to Codex app-server thread stream. This both
+        // surfaces resumed sessions immediately (Codex doesn't fire
+        // SessionStart hooks on resume — they only fire on the first prompt)
+        // and propagates user-renamed session titles.
+        codexAppServer.$threads
+            .sink { [weak self] threads in
+                self?.sessionStore.applyCodexThreads(threads)
+            }
+            .store(in: &cancellables)
+        codexAppServer.start()
 
         // Show onboarding on first launch
         if !settingsStore.hasCompletedOnboarding {

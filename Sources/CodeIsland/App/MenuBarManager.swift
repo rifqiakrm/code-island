@@ -10,11 +10,13 @@ final class MenuBarManager {
     private let settingsStore: SettingsStore
     private let sessionStore: SessionStore
     private let onQuit: () -> Void
+    private let onReloadSounds: () -> Void
     private var settingsWindow: NSWindow?
 
-    init(settingsStore: SettingsStore, sessionStore: SessionStore, onQuit: @escaping () -> Void) {
+    init(settingsStore: SettingsStore, sessionStore: SessionStore, onReloadSounds: @escaping () -> Void, onQuit: @escaping () -> Void) {
         self.settingsStore = settingsStore
         self.sessionStore = sessionStore
+        self.onReloadSounds = onReloadSounds
         self.onQuit = onQuit
         setupStatusItem()
         NotificationCenter.default.addObserver(self, selector: #selector(openSettings), name: .openSettings, object: nil)
@@ -81,9 +83,9 @@ final class MenuBarManager {
             return
         }
 
-        let view = SettingsView(settingsStore: settingsStore)
+        let view = SettingsView(settingsStore: settingsStore, onReloadSounds: onReloadSounds)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 580),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

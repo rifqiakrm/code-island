@@ -2,11 +2,29 @@ import Foundation
 import AppKit
 
 // MARK: - Code Island Bridge
-// Reads hook JSON from Claude Code via stdin, maps to Code Island format,
-// sends to the app via Unix domain socket.
+// Reads hook JSON from a coding agent (Claude Code, Codex, etc.) via stdin,
+// maps to Code Island format, sends to the app via Unix domain socket.
 // For PermissionRequest: waits for response and outputs to stdout.
+//
+// Usage: code-island-bridge [--source <id>]   (default --source claude)
 
 let socketPath = "/tmp/code-island.sock"
+
+// Parse CLI args: optional `--source <id>` flag identifies which AI agent
+// the hook came from. Defaults to "claude" for backward compatibility.
+var providerSource = "claude"
+do {
+    var i = 1
+    let args = CommandLine.arguments
+    while i < args.count {
+        if args[i] == "--source" && i + 1 < args.count {
+            providerSource = args[i + 1]
+            i += 2
+        } else {
+            i += 1
+        }
+    }
+}
 
 // Read stdin
 let inputData = FileHandle.standardInput.readDataToEndOfFile()
@@ -162,6 +180,7 @@ func lastAssistantFromTranscript(_ path: String) -> String? {
 var message: [String: Any] = [
     "session_id": sessionId,
     "hook_event": hookEvent,
+    "source": providerSource,
 ]
 if let cwd { message["cwd"] = cwd }
 if let toolName { message["tool_name"] = toolName }
@@ -170,6 +189,12 @@ if let toolFilePath { message["tool_file_path"] = toolFilePath }
 if let toolContent { message["tool_content"] = toolContent }
 if let toolOldString { message["tool_old_string"] = toolOldString }
 if let toolNewString { message["tool_new_string"] = toolNewString }
+
+// Capture our parent PID. The bridge is launched directly by the AI agent
+// (the launcher script `exec`s into the bridge, so getppid() returns the
+// agent itself). The app uses this to detect when the agent has exited so
+// the session can be removed from the notch.
+message["agent_pid"] = Int(getppid())
 if !envVars.isEmpty { message["_env"] = envVars }
 if let userMessage { message["user_message"] = userMessage }
 if let assistantMessage { message["assistant_message"] = assistantMessage }
@@ -209,9 +234,24 @@ guard connected == 0 else {
     exit(1)
 }
 
-// Send message
-messageData.withUnsafeBytes { ptr in
-    _ = write(fd, ptr.baseAddress!, messageData.count)
+// Send message — loop write until all bytes are sent (write() can return
+// less than requested when the socket buffer is full, which happens with
+// large payloads like long Bash commands).
+messageData.withUnsafeBytes { rawPtr in
+    let base = rawPtr.bindMemory(to: UInt8.self).baseAddress!
+    var sent = 0
+    while sent < messageData.count {
+        let n = write(fd, base.advanced(by: sent), messageData.count - sent)
+        if n <= 0 { break }
+        sent += n
+    }
+}
+
+// For non-permission events, half-close the write side so the app knows
+// the message is complete (its read loop can exit immediately on EOF
+// instead of waiting for the 1s read timeout).
+if hookEvent != "PermissionRequest" {
+    shutdown(fd, SHUT_WR)
 }
 
 // For permission requests, wait for response

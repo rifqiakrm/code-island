@@ -16,6 +16,7 @@ let package = Package(
             path: "Sources/CodeIsland",
             resources: [
                 .copy("../../Resources/Sounds"),
+                .copy("../../Resources/cli-icons"),
             ]
         ),
         .executableTarget(

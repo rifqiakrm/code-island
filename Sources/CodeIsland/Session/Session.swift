@@ -59,7 +59,7 @@ struct QuestionOption: Identifiable {
 
 struct Session: Identifiable {
     let id: String
-    let cwd: String
+    var cwd: String
     let startedAt: Date
     var status: SessionStatus
     var currentTool: String?
@@ -73,15 +73,53 @@ struct Session: Identifiable {
     var effortLevel: String?
     var lastToolDurationMs: Int?
     var sessionTitle: String?
+    /// AI provider identifier (claude / codex / gemini / ...).
+    /// Defaults to "claude" if the bridge doesn't stamp a source.
+    var source: String = "claude"
+    /// Time of the most recent event from this session — used so the collapsed
+    /// notch tracks the *currently active* session, not just whichever was opened first.
+    var lastActivityAt: Date = .init()
+    /// When the session most recently entered an active state (thinking/toolUse).
+    /// Cleared when status returns to idle. Used to render the live "Xms" counter.
+    var activeStartedAt: Date?
+    /// PID of the AI agent process (Claude / Codex / ...). Used to detect when
+    /// the agent has exited so we can clean up the session — agents don't
+    /// always fire SessionEnd reliably (Codex doesn't, for example).
+    var agentPid: Int?
+
+    /// Resolved provider object for theming/grouping.
+    var provider: AIProvider { AIProvider.from(source) }
 
     var projectName: String {
         (cwd as NSString).lastPathComponent
     }
 
-    /// Preferred display name — uses Claude's session title if set, else falls back to folder name.
+    /// Preferred display name. Falls through three sources in order:
+    ///   1. `sessionTitle` — Claude Code sends this; Codex doesn't.
+    ///   2. The folder name from `cwd` if it looks like a real project (not the
+    ///      user's home directory).
+    ///   3. The first prompt the user sent, truncated. Better than showing the
+    ///      home-folder name when Codex was launched from `~`.
     var displayName: String {
         if let title = sessionTitle, !title.isEmpty { return title }
+        if isMeaningfulProjectFolder { return projectName }
+        if let prompt = firstPrompt, !prompt.isEmpty {
+            return Self.truncated(prompt)
+        }
         return projectName
+    }
+
+    /// True when `cwd` isn't the user's home directory and isn't `/` —
+    /// i.e. it points at a project we'd want to show in the title slot.
+    private var isMeaningfulProjectFolder: Bool {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return cwd != home && cwd != "/" && cwd != "~"
+    }
+
+    private static func truncated(_ s: String, max: Int = 40) -> String {
+        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count <= max { return trimmed }
+        return String(trimmed.prefix(max)) + "…"
     }
 
     var durationText: String {

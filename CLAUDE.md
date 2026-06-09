@@ -1,53 +1,85 @@
 # Code Island
 
-A native macOS Swift app that turns your MacBook's notch into a live dashboard for Claude Code. Inspired by [Vibe Island](https://vibeisland.app). See [README.md](README.md) for user-facing docs.
+A native macOS Swift app that turns your MacBook's notch into a live dashboard for your AI coding agents (Claude Code + OpenAI Codex). Inspired by [Vibe Island](https://vibeisland.app). See [README.md](README.md) for user-facing docs.
 
 ## Architecture
 
 ```
 Code Island.app/
 ├── Contents/
-│   ├── MacOS/code-island              ← Main SwiftUI app (menu bar, notch panel)
-│   ├── Helpers/CodeIslandBridge       ← CLI bridge (reads Claude Code hooks via stdin)
-│   └── Info.plist                     ← LSUIElement=true (no dock icon)
+│   ├── MacOS/code-island                ← Main SwiftUI app (menu bar, notch panel)
+│   ├── Helpers/CodeIslandBridge         ← CLI bridge (reads hook JSON via stdin; --source flag)
+│   └── Info.plist                       ← LSUIElement=true (no dock icon)
 └── ~/.code-island/
-    ├── bin/code-island-bridge         ← Shell launcher that finds the bridge binary
+    ├── bin/code-island-bridge           ← Claude launcher (zsh shim)
+    ├── bin/code-island-codex-bridge     ← Codex launcher (passes --source codex)
     ├── run/code-island.pid
-    ├── cache/rl.json                  ← Rate limits (written by code-island-statusline)
-    ├── debug.log                      ← Runtime debug log
-    └── sound-packs/                   ← User sound packs (future)
+    ├── cache/rl.json                    ← Cached rate limits per provider
+    ├── debug.log                        ← Runtime debug log
+    └── sound-packs/                     ← User sound packs
 ```
 
 **Tech stack**: Swift 5.9+, SwiftUI + AppKit, macOS 14.0+, SPM
 
+## Provider Abstraction
+
+`AIProvider` (Sources/CodeIsland/Session/AIProvider.swift) unifies Claude and Codex with:
+- `id`, `displayName`, `accentColor`
+- `mascotShape` (.crab / .box / .sparkle)
+- `mascotPalette` / `activeMascotPalette`
+- `AIProvider.from(source:)` maps the bridge's `source` field to a provider
+
+Each `Session.source` defaults to "claude" if the bridge doesn't stamp it.
+
 ## IPC Flow
 
-1. Claude Code fires hooks (SessionStart, Stop, PreToolUse, PostToolUse, PermissionRequest, etc.)
-2. Hook calls `~/.code-island/bin/code-island-bridge` with JSON on stdin
-3. Bridge enriches with env vars (terminal detection via process tree walk)
+1. Agent fires hooks (SessionStart, Stop, PreToolUse, PostToolUse, PermissionRequest, etc.)
+2. Hook calls the appropriate launcher in `~/.code-island/bin/` with JSON on stdin
+3. Bridge stamps `source` (claude / codex), captures parent PID via `getppid()`, enriches with terminal env vars (process tree walk for bundle ID)
 4. Bridge sends JSON to Code Island app via Unix socket at `/tmp/code-island.sock`
 5. For PermissionRequest: socket connection stays open, app sends response back, bridge outputs to stdout
 
 ## Key Hook Payload Fields
 
 - `hook_event_name` — event type (NOT `hook_event`)
-- `prompt` — user's message (in UserPromptSubmit)
-- `last_assistant_message` — Claude's response (in Stop)
-- `permission_mode` — "bypassPermissions" means auto-allow (only set at session startup, can't be set mid-session)
+- `prompt` — user's message (UserPromptSubmit)
+- `last_assistant_message` — assistant's response (Stop, Claude only)
+- `permission_mode` — "bypassPermissions" means auto-allow (Claude only, set at session startup)
 - `transcript_path` — path to session .jsonl file
-- `tool_name` — for AskUserQuestion, show question UI instead of permission UI
+- `tool_name` — for `AskUserQuestion` (Claude) or `request_user_input` (Codex), show question UI
+- `source` — provider identifier ("claude" / "codex"), stamped by the bridge
 
-## Permission Modes (mid-session setMode)
+## Permission Modes (Claude, mid-session setMode)
 
 - `bypassPermissions` — **cannot be set mid-session**, only at Claude Code startup via `--dangerously-skip-permissions`. Mid-session setMode requests are silently ignored.
-- `dontAsk` — works mid-session, suppresses future permission prompts for the session. This is what our "Bypass" button actually sends.
+- `dontAsk` — works mid-session, suppresses future permission prompts for the session. This is what our "Bypass" button actually sends to Claude.
 - `default` — normal mode, prompts for permissions.
+
+## Codex Permission Persistence
+
+Codex rejects Claude's `updatedPermissions` shape. For Allow All / Bypass we instead append a `prefix_rule(...)` block to `~/.codex/rules/codeisland.rules` (see `CodexPermissionRules.swift`):
+- **Allow All** for Bash: first 3 tokens become the prefix (`git commit -m`)
+- **Allow All** for other tools: prefix is the tool name
+- **Bypass** (broad): first 1 token (Codex rejects empty patterns — true wildcards aren't possible)
+
+The hook then responds with a plain `behavior: allow` since the rule will match future calls.
+
+## Codex `request_user_input` Mirror
+
+Codex's equivalent of Claude's `AskUserQuestion` fires via `PreToolUse` with `tool_name = "request_user_input"` and `tool_input.questions` matching Claude's shape. Codex PreToolUse hooks only support `allow/deny` (no answer substitution), so we:
+
+1. Detect it in `SessionStore.handleMessage` PreToolUse branch
+2. Mirror the question in the notch via `pendingQuestion`
+3. On click, call `TerminalJumper.jump(to: session)` to surface Codex.app — user answers there
+4. PostToolUse clears the pending question via the existing `pendingDismissedExternally` path
 
 ## Bridge Terminal Detection
 
-The bridge walks up the process tree (ppid chain) to find the first GUI app with a bundle ID. This is fully dynamic — works with any terminal/IDE without hardcoding. iTerm2 gets special treatment (AppleScript tab jump via ITERM_SESSION_ID, but only when TERM_PROGRAM=iTerm.app to avoid inherited env vars).
+The bridge walks up the process tree (ppid chain) to find the first GUI app with a bundle ID. Fully dynamic — works with any terminal/IDE without hardcoding. iTerm2 gets special treatment (AppleScript tab jump via ITERM_SESSION_ID, but only when TERM_PROGRAM=iTerm.app to avoid inherited env vars).
 
-## Permission Response Format
+For Codex.app, the bundle ID is `com.openai.codex`; jump just activates the app (no tab API).
+
+## Permission Response Format (Claude)
 
 ```json
 {
@@ -57,14 +89,14 @@ The bridge walks up the process tree (ppid chain) to find the first GUI app with
       "behavior": "allow|deny",
       "updatedPermissions": [
         {"type": "addRules", "rules": [{"toolName": "Bash"}], "behavior": "allow", "destination": "session"},
-        {"type": "setMode", "mode": "bypassPermissions", "destination": "session"}
+        {"type": "setMode", "mode": "dontAsk", "destination": "session"}
       ]
     }
   }
 }
 ```
 
-## Question (AskUserQuestion) Response Format
+## Question (AskUserQuestion) Response Format (Claude)
 
 ```json
 {
@@ -81,21 +113,29 @@ The bridge walks up the process tree (ppid chain) to find the first GUI app with
 }
 ```
 
+## Rate Limits
+
+Live-fetched over HTTP (not statusline anymore):
+- Claude: `api.anthropic.com/api/oauth/usage` with OAuth token from env → keychain → refresh
+- Codex: `chatgpt.com/backend-api/wham/usage` with ChatGPT auth token
+
+`RateLimitStore` keeps a per-provider snapshot, polls every 5 minutes, and `RateLimitBar` renders the active provider's 5h+7d windows. Tap to cycle providers; empty providers are skipped.
+
 ## Notch Window
 
 - Layer 27 (same as Vibe Island, just above menu bar at 25)
 - `constrainFrameRect` override to render in notch area
 - `ClickThroughHostingView` with `acceptsFirstMouse` for click-through
 - Collapsed: 280x34 on notch Macs, 280x5 on non-notch Macs (just a hover strip)
-- Expanded: 520x320, Permission: 520x300, Question: 520x420, Finished: 520x200
+- Expanded: 600x320, Permission: 600x380, Question: 600x480, Finished: 600x380
 
 ## States
 
 - **Collapsed** — mascot left, session count right
-- **Expanded** (hover) — rate limits header + sound toggle + settings gear + session cards + footer
+- **Expanded** (hover) — rate limit bar + sound toggle + settings gear + filter chips (when ≥2 providers active) + collapsible per-provider section list + footer
 - **Finished** (Stop event) — rate limit bar + session card with scrollable response + Done button, auto-collapses in 3s
 - **Permission** — rate limit bar + tool details + 4 buttons (Deny, Allow Once, Allow All, Bypass)
-- **Question** — rate limit bar + all questions shown, pill buttons, multi-select support, Submit All Answers
+- **Question** — rate limit bar + all questions shown, pill buttons, multi-select (Claude only), Submit All Answers
 
 ## Permission/Question Queue
 
@@ -105,9 +145,17 @@ The bridge walks up the process tree (ppid chain) to find the first GUI app with
 - Permission/question states don't auto-collapse on mouse exit — user must respond
 - `pendingPermission` / `pendingQuestion` cleared **synchronously** in `respondToPermission()` / `respondToQuestion()` before invoking the response closure, so the queue check sees accurate state
 
-## Mascot
+## Session Cleanup
 
-13x8 pixel grid from the official Claude Code mascot generator (https://claude-code-mascot-generator.replit.app/). Colors change by status: terracotta (default), cyan (thinking), green (idle), red (error). Animated bounce when thinking.
+Process-based, not time-based. Every 5s, `SessionStore.sweepClosedAgents()` calls `kill(pid, 0)` on each session's `agentPid` — if errno == ESRCH the process is gone and the session is marked completed and removed. This handles Codex's missing SessionEnd reliably while letting long-idle Claude sessions stay open.
+
+## Mascots
+
+- **Claude**: 13x8 pixel crab from the [Claude Code Mascot Generator](https://claude-code-mascot-generator.replit.app/). Terracotta default, cyan thinking, green idle, red error.
+- **Codex**: pixel terminal box (head bump + body + `>_` face + stubby feet) in 58x52 logical space. Light gray default, sky-blue active.
+- **Gemini**: sparkle (placeholder for future Gemini integration).
+
+Animated bounce when thinking; color swaps via `mascotPalette` vs `activeMascotPalette`.
 
 ## Building
 
@@ -120,7 +168,7 @@ swift build -c release         # Release
 
 ```bash
 brew install create-dmg
-# See build script or run the create-dmg command from the conversation
+./scripts/build-dmg.sh 1.0.0   # produces build/Code-Island-1.0.0.dmg
 ```
 
 ## Development Tips
@@ -131,6 +179,8 @@ brew install create-dmg
 - Full uninstall: `pkill -9 CodeIsland; rm -rf "/Applications/Code Island.app" ~/.code-island; defaults delete dev.codeisland.macos; rm -f /tmp/code-island.sock`
 - Debug log: `tail -f ~/.code-island/debug.log`
 - Test bridge: `echo '{"session_id":"test","hook_event_name":"SessionStart","cwd":"/tmp"}' | .build/debug/CodeIslandBridge`
+- Test Codex bridge: append `--source codex` to the bridge invocation
+- Tap raw Codex JSON: swap `~/.code-island/bin/code-island-codex-bridge` for a tee script that copies stdin to a debug file before forwarding
 
 ## Sounds
 
@@ -141,15 +191,21 @@ Per-sound toggles in Settings + onboarding `SoundEngine`:
 - `error`
 - `approvalNeeded` / `approvalGranted` / `approvalDenied`
 
-Generated at runtime by `SoundSynthesizer` (8-bit square/triangle/sawtooth waves). No audio files bundled.
+Generated at runtime by `SoundSynthesizer` (8-bit square/triangle/sawtooth waves). Drop custom audio files (`.wav` / `.mp3` / `.m4a` / `.aiff` / `.caf`) into `~/.code-island/sound-packs/<event-name>.<ext>` to override; delete the file to revert to the synth default.
 
-## Hook Installer
+## Hook Installers
 
-`HookInstaller.install()` is idempotent and creates `~/.claude/settings.json` if missing (so first-time Claude Code users work). It:
-1. Creates `~/.claude/` directory if needed
+Both installers run idempotently on every launch (see `AppDelegate.applicationDidFinishLaunching`).
+
+### Claude (`HookInstaller`)
+1. Creates `~/.claude/` if needed (so first-time Claude users work)
 2. Adds/updates hook entries for all event types with `matcher: "*"`
-3. Sets `statusLine` to our script at `~/.code-island/bin/code-island-statusline`
-4. Writes the bridge launcher script (a zsh shim that locates the binary in Applications or dev build)
-5. Writes the statusline script (caches `rate_limits` field from statusLine input to `~/.code-island/cache/rl.json`)
+3. Writes the bridge launcher script at `~/.code-island/bin/code-island-bridge`
 
-Returns `Bool` for success/failure — onboarding shows a checkmark or retry UI based on this.
+### Codex (`CodexInstaller`)
+1. Creates `$CODEX_HOME` (default `~/.codex/`) if needed
+2. Writes `~/.codex/hooks.json` in Codex's nested format (no `matcher` field) subscribing to: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, Stop, PermissionRequest, Notification, SubagentStart, SubagentStop, PreCompact
+3. Sets `[features].hooks = true` in `~/.codex/config.toml` (creates the section if missing)
+4. Writes the bridge launcher at `~/.code-island/bin/code-island-codex-bridge` (passes `--source codex`)
+
+Both return `Bool` for success/failure — onboarding shows a checkmark or retry UI based on this.

@@ -58,7 +58,7 @@ struct OnboardingView: View {
                 .font(.system(size: 28, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
 
-            Text("Your MacBook's notch is about to become\nyour AI coding command center.")
+            Text("Your MacBook's notch is about to become\nthe command center for Claude Code & Codex.")
                 .font(.system(size: 14, design: .monospaced))
                 .foregroundColor(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
@@ -73,15 +73,15 @@ struct OnboardingView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            Image(systemName: "gearshape.2.fill")
+            Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 48))
-                .foregroundColor(.cyan)
+                .foregroundColor(.green)
 
-            Text("Install Hooks")
+            Text("Hooks Installed")
                 .font(.system(size: 24, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
 
-            Text("Code Island needs to register hooks with Claude Code\nto receive session events in real-time.")
+            Text("Code Island wired itself up automatically.\nIt's listening to these events:")
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
@@ -98,33 +98,21 @@ struct OnboardingView: View {
                     .fill(.white.opacity(0.05))
             )
 
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.cyan)
+                Text("Configured for Claude Code & Codex")
+            }
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundColor(.white.opacity(0.6))
+
             Spacer()
 
-            if let success = hookInstallSuccess {
-                HStack(spacing: 8) {
-                    Image(systemName: success ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(success ? .green : .orange)
-                    Text(success ? "Hooks installed successfully!" : "Could not install hooks. Make sure Claude Code has been run at least once.")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(success ? .green : .orange)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill((success ? Color.green : Color.orange).opacity(0.1))
-                )
-            }
-
             Button(action: {
-                let success = HookInstaller.install()
-                hookInstallSuccess = success
-                if success {
-                    currentStep += 1
-                    confettiTrigger += 1
-                }
+                currentStep += 1
+                confettiTrigger += 1
             }) {
-                Text(hookInstallSuccess == false ? "Retry Install" : "Install Hooks & Continue")
+                Text("Continue")
                     .font(.system(size: 14, weight: .semibold, design: .monospaced))
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
@@ -150,7 +138,7 @@ struct OnboardingView: View {
                 .font(.system(size: 28, weight: .bold, design: .monospaced))
                 .foregroundColor(.white)
 
-            Text("Code Island is now monitoring your Claude Code sessions.\nStart coding and watch the notch come alive!")
+            Text("Code Island is now monitoring your AI coding agents.\nStart Claude Code or Codex and watch the notch come alive!")
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(.white.opacity(0.7))
                 .multilineTextAlignment(.center)

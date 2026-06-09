@@ -31,6 +31,11 @@ cp .build/release/CodeIsland "$APP/Contents/MacOS/Code Island"
 cp .build/release/CodeIslandBridge "$APP/Contents/Helpers/CodeIslandBridge"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
+# Copy CLI provider icons into the app bundle so the notch can render them
+if [ -d Resources/cli-icons ]; then
+  cp -R Resources/cli-icons "$APP/Contents/Resources/cli-icons"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

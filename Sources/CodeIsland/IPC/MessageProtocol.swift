@@ -19,6 +19,12 @@ struct BridgeMessage: Codable {
     let toolOldString: String?
     let toolNewString: String?
     let sessionTitle: String?
+    /// Identifier of the AI provider that fired this hook (e.g. "claude", "codex").
+    /// Defaults to "claude" if the bridge doesn't stamp this field.
+    let source: String?
+    /// PID of the agent process that spawned the bridge (getppid in the bridge).
+    /// Used to detect when an agent exits without firing SessionEnd.
+    let agentPid: Int?
 
     var terminalInfo: TerminalInfo? {
         guard let env else { return nil }
@@ -51,6 +57,8 @@ struct BridgeMessage: Codable {
         case toolOldString = "tool_old_string"
         case toolNewString = "tool_new_string"
         case sessionTitle = "session_title"
+        case source
+        case agentPid = "agent_pid"
     }
 }
 

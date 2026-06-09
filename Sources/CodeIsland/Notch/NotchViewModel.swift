@@ -18,18 +18,27 @@ final class NotchViewModel: ObservableObject {
     // MARK: - Dimensions
     // Vibe Island uses Y=0 (screen top) with large windows.
     // Heights INCLUDE the notch/menu bar overlap (~32pt on top).
-    static let notchOverlap: CGFloat = ScreenDetector.hasNotch ? ScreenDetector.notchHeight : 0
+    // Computed properties so they re-evaluate when display parameters change.
+    static var notchOverlap: CGFloat { ScreenDetector.hasNotch ? ScreenDetector.notchHeight : 0 }
 
-    static let collapsedSize = NSSize(width: 280, height: ScreenDetector.hasNotch ? 34 : 5)
+    // Size adapts to the OS-reported notch cutout (safeAreaInsets.top + auxiliary
+    // top areas). Width extends ~50pt beyond the notch on each side so the
+    // mascot and session count have room. Height is notch height + small buffer.
+    static var collapsedSize: NSSize {
+        guard ScreenDetector.hasNotch else { return NSSize(width: 280, height: 5) }
+        let width = max(280, ScreenDetector.notchWidth + 100)
+        let height = ScreenDetector.notchHeight + 4
+        return NSSize(width: width, height: height)
+    }
     // Expanded: compact, fits ~3 session cards
-    static let expandedSize = NSSize(width: 520, height: 320)
+    static let expandedSize = NSSize(width: 600, height: 320)
     // Permission: wide enough for details
-    static let permissionSize = NSSize(width: 520, height: 380)
+    static let permissionSize = NSSize(width: 600, height: 380)
     // Question: taller for multiple questions
-    static let questionSize = NSSize(width: 520, height: 480)
+    static let questionSize = NSSize(width: 600, height: 480)
 
     // Finished notification: compact, just one card
-    static let finishedSize = NSSize(width: 520, height: 380)
+    static let finishedSize = NSSize(width: 600, height: 380)
 
     // Dynamic content height — set when showing permission/finished based on actual content
     @Published var dynamicPermissionHeight: CGFloat? = nil
@@ -42,9 +51,9 @@ final class NotchViewModel: ObservableObject {
         case .expanded:
             return Self.expandedSize
         case .finished:
-            return NSSize(width: 520, height: dynamicFinishedHeight ?? Self.finishedSize.height)
+            return NSSize(width: 600, height: dynamicFinishedHeight ?? Self.finishedSize.height)
         case .permission:
-            return NSSize(width: 520, height: dynamicPermissionHeight ?? Self.permissionSize.height)
+            return NSSize(width: 600, height: dynamicPermissionHeight ?? Self.permissionSize.height)
         case .question:
             return Self.questionSize
         }
@@ -66,7 +75,7 @@ final class NotchViewModel: ObservableObject {
             h += 24 + 50
         }
         h += 12 + 36 + 12 // spacer + buttons + bottom padding
-        return min(max(h, 200), 520)
+        return min(max(h, 200), 600)
     }
 
     static func permissionHeight(for session: Session) -> CGFloat {
@@ -92,7 +101,7 @@ final class NotchViewModel: ObservableObject {
     }
 
     private static func estimateVisualLines(_ text: String) -> Int {
-        let charsPerLine = 62
+        let charsPerLine = 72
         var lines = 0
         for line in text.components(separatedBy: "\n") {
             lines += max(1, (line.count + charsPerLine - 1) / charsPerLine)
@@ -113,7 +122,7 @@ final class NotchViewModel: ObservableObject {
             h += 24 + bodyHeight
         }
         h += 12 + 36 + 12 // spacer + dismiss + bottom padding
-        return min(max(h, 200), 520)
+        return min(max(h, 200), 600)
     }
 
     var isExpanded: Bool {

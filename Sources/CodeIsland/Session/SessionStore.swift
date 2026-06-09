@@ -20,6 +20,41 @@ final class SessionStore: ObservableObject {
 
     let onEvent = PassthroughSubject<SessionEvent, Never>()
 
+    /// Polls every 5s to check whether the AI agent process is still alive.
+    /// Cleaner than time-based cleanup because long idle sessions stay open
+    /// while genuinely-exited sessions get removed quickly.
+    private var processSweepTimer: Timer?
+
+    init() {
+        processSweepTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sweepClosedAgents() }
+        }
+    }
+
+    deinit {
+        processSweepTimer?.invalidate()
+    }
+
+    /// Marks sessions whose agent process has exited as ended, then removes them.
+    /// Uses `kill(pid, 0)` which probes whether the process exists without
+    /// actually sending a signal — returns -1 with errno=ESRCH if it's gone.
+    private func sweepClosedAgents() {
+        for (id, session) in sessions {
+            guard let pid = session.agentPid else { continue }
+            let result = kill(pid_t(pid), 0)
+            if result != 0 && errno == ESRCH {
+                // Agent process is gone — clean up
+                guard session.status != .completed else { continue }
+                sessions[id]?.status = .completed
+                onEvent.send(.sessionEnded(id))
+                Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(2))
+                    await MainActor.run { self?.sessions.removeValue(forKey: id) }
+                }
+            }
+        }
+    }
+
     var activeSessions: [String: Session] {
         sessions.filter { $0.value.status != .completed }
     }
@@ -32,18 +67,26 @@ final class SessionStore: ObservableObject {
                 cwd: message.cwd ?? "~",
                 startedAt: Date(),
                 status: .idle,
-                terminalInfo: message.terminalInfo
+                terminalInfo: message.terminalInfo,
+                source: message.source ?? "claude"
             )
         }
-        // Update terminal info if available
+        // Update terminal info / source if newer info arrives
         if let info = message.terminalInfo {
             sessions[sessionId]?.terminalInfo = info
+        }
+        if let src = message.source {
+            sessions[sessionId]?.source = src
         }
     }
 
     func handleMessage(_ message: BridgeMessage, respond: ((BridgeResponse) -> Void)?, respondRaw: ((Data) -> Void)? = nil) {
         let sessionId = message.sessionId
         ensureSession(message)
+        // Stamp activity time on every event so the collapsed notch tracks
+        // whatever provider is most recently doing something.
+        sessions[sessionId]?.lastActivityAt = Date()
+        let statusBefore = sessions[sessionId]?.status
 
         // Always update effort level if present (it's on most hooks)
         if let effort = message.effortLevel {
@@ -52,6 +95,10 @@ final class SessionStore: ObservableObject {
         // Always update session title if present
         if let title = message.sessionTitle, !title.isEmpty {
             sessions[sessionId]?.sessionTitle = title
+        }
+        // Capture the agent PID — used to detect when the agent exits
+        if let pid = message.agentPid, pid > 0 {
+            sessions[sessionId]?.agentPid = pid
         }
 
         // If a new event arrives while a permission/question is still pending,
@@ -98,6 +145,29 @@ final class SessionStore: ObservableObject {
             sessions[sessionId]?.currentTool = toolName
             onEvent.send(.toolStarted(sessionId, toolName))
 
+            // Codex's AskUserQuestion equivalent — fires through PreToolUse, not
+            // PermissionRequest. We can't reply via the hook (Codex PreToolUse
+            // only supports allow/deny, not substituting an answer), so we
+            // mirror the question in the notch and route any click to the app.
+            if (message.source ?? "claude") == "codex",
+               toolName == "request_user_input",
+               let desc = message.toolInput,
+               let parsedQuestions = Self.parseQuestion(desc) {
+                sessions[sessionId]?.status = .waitingPermission
+                sessions[sessionId]?.pendingQuestion = PendingQuestion(
+                    questions: parsedQuestions,
+                    respond: { [weak self] _ in
+                        // Can't answer via hook — surface Codex.app so the
+                        // user finishes there. PostToolUse will dismiss the
+                        // notch's question view once they've answered.
+                        if let session = self?.sessions[sessionId] {
+                            TerminalJumper.jump(to: session)
+                        }
+                    }
+                )
+                onEvent.send(.questionAsked(sessionId))
+            }
+
         case "PostToolUse":
             let toolName = message.toolName ?? "unknown"
             sessions[sessionId]?.status = .thinking
@@ -140,28 +210,36 @@ final class SessionStore: ObservableObject {
                     content: message.toolContent,
                     oldString: message.toolOldString,
                     newString: message.toolNewString,
-                    respond: { action in
+                    respond: { [weak self] action in
                         Log.info("Permission responded: \(action) for session=\(sessionId.prefix(8)), respondRaw=\(respondRaw != nil)")
-                        // State is already cleared by respondToPermission() synchronously
+                        // State is already cleared by respondToPermission() synchronously.
+                        // Codex rejects Claude's `updatedPermissions` shape, so we
+                        // persist allow-all / bypass via a TOML rules file instead
+                        // and return a plain `behavior: allow`.
+                        let isCodex = self?.sessions[sessionId]?.source == "codex"
                         switch action {
                         case .deny:
                             respond?(BridgeResponse.deny())
                         case .allowOnce:
                             respond?(BridgeResponse.allow())
                         case .allowAll:
-                            if let data = BridgeResponse.allowAllForTool(toolName), respondRaw != nil {
-                                Log.info("Sending allowAll raw data (\(data.count) bytes)")
+                            if isCodex {
+                                CodexPermissionRules.persistAlwaysAllow(toolName: toolName, toolInput: description)
+                                respond?(BridgeResponse.allow())
+                            } else if let data = BridgeResponse.allowAllForTool(toolName), respondRaw != nil {
+                                Log.info("Sending Claude allowAll raw data (\(data.count) bytes)")
                                 respondRaw?(data)
                             } else {
-                                Log.info("Falling back to simple allow for allowAll")
                                 respond?(BridgeResponse.allow())
                             }
                         case .bypass:
-                            if let data = BridgeResponse.bypass(), respondRaw != nil {
-                                Log.info("Sending bypass raw data (\(data.count) bytes)")
+                            if isCodex {
+                                CodexPermissionRules.persistAlwaysAllow(toolName: toolName, toolInput: description, broad: true)
+                                respond?(BridgeResponse.allow())
+                            } else if let data = BridgeResponse.bypass(), respondRaw != nil {
+                                Log.info("Sending Claude bypass raw data (\(data.count) bytes)")
                                 respondRaw?(data)
                             } else {
-                                Log.info("Falling back to simple allow for bypass")
                                 respond?(BridgeResponse.allow())
                             }
                         }
@@ -198,6 +276,19 @@ final class SessionStore: ObservableObject {
 
         default:
             break
+        }
+
+        // Maintain the live "active timer" used by the session card. Starts when
+        // we first enter an active state from idle; carries through across
+        // thinking ↔ toolUse transitions; resets when we go back to idle.
+        if let after = sessions[sessionId]?.status {
+            let wasActive = statusBefore == .thinking || statusBefore == .toolUse
+            let isActive = after == .thinking || after == .toolUse
+            if isActive && !wasActive {
+                sessions[sessionId]?.activeStartedAt = Date()
+            } else if !isActive {
+                sessions[sessionId]?.activeStartedAt = nil
+            }
         }
     }
 
@@ -239,6 +330,64 @@ final class SessionStore: ObservableObject {
         sessions[sessionId]?.status = .thinking
         pending.respond(action)
         onEvent.send(.permissionResponded(sessionId, action != .deny))
+    }
+
+    /// Apply renamed Codex session titles fetched from the codex app-server.
+    /// Matches by `session_id` since Codex's hook session id is the same UUID
+    /// it reports as `thread.id` from the JSON-RPC stream. Sessions that
+    /// already have a title (user-provided or from Claude) are left alone.
+    func applyCodexThreadNames(_ names: [String: String]) {
+        for (threadId, name) in names {
+            guard var session = sessions[threadId] else { continue }
+            // Only overwrite the title if the existing one is empty or matches
+            // the auto-derived fallback (folder name / first prompt).
+            let current = session.sessionTitle ?? ""
+            if current.isEmpty || current == session.projectName {
+                session.sessionTitle = name
+                sessions[threadId] = session
+            }
+        }
+    }
+
+    /// Mirror the app-server thread stream into proper Session records.
+    ///
+    /// Codex doesn't fire a SessionStart hook on `codex resume <id>` — hooks
+    /// only kick in once the user submits a prompt. The app-server stream,
+    /// however, emits a `thread/started` notification immediately on resume.
+    /// We use that to surface the session in the notch right away instead of
+    /// waiting for the first prompt.
+    ///
+    /// Sessions created this way are intentionally bare: cwd if we got it,
+    /// the renamed title if any, status=.idle. Real hook payloads later
+    /// enrich them with terminal info, PIDs, prompts, etc.
+    func applyCodexThreads(_ infos: [String: CodexThreadInfo]) {
+        // Create sessions for newly-discovered threads.
+        for (id, info) in infos {
+            if sessions[id] == nil {
+                sessions[id] = Session(
+                    id: id,
+                    cwd: info.cwd ?? "~",
+                    startedAt: Date(),
+                    status: .idle,
+                    source: "codex"
+                )
+                if let name = info.name, !name.isEmpty {
+                    sessions[id]?.sessionTitle = name
+                }
+                onEvent.send(.sessionStarted(id))
+            } else {
+                // Update title for existing sessions if we got a name.
+                if let name = info.name, !name.isEmpty {
+                    let current = sessions[id]?.sessionTitle ?? ""
+                    if current.isEmpty || current == sessions[id]?.projectName {
+                        sessions[id]?.sessionTitle = name
+                    }
+                }
+                if let cwd = info.cwd, !cwd.isEmpty, sessions[id]?.cwd == "~" {
+                    sessions[id]?.cwd = cwd
+                }
+            }
+        }
     }
 
     /// Returns the session ID of the next session with a pending permission, if any.

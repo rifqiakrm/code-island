@@ -40,21 +40,16 @@ enum HookInstaller {
 
         settings["hooks"] = hooks
 
-        // Set statusLine to our script
-        let statusLineCommand = home.path + "/.code-island/bin/code-island-statusline"
-        settings["statusLine"] = [
-            "type": "command",
-            "command": statusLineCommand,
-        ] as [String: Any]
+        // Note: we used to install a `statusLine` here to cache rate limits
+        // from Claude Code's status feed. That's now superseded by the HTTP
+        // fetcher in `UsageFetcher`, which works whether Claude is running or
+        // not — so we deliberately don't touch the user's statusLine anymore.
 
         // Write back
         writeJSON(settings, to: settingsPath)
 
         // Install bridge launcher script
         installBridgeLauncher()
-
-        // Install statusline script
-        installStatusLine()
 
         print("[CodeIsland] Hooks installed successfully")
         return true
