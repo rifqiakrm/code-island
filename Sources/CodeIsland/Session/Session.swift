@@ -35,12 +35,36 @@ struct PendingPermission {
     let oldString: String?
     let newString: String?
     let respond: (PermissionAction) -> Void
+    /// Enqueue time. Used to surface oldest-first in the notch queue
+    /// (deterministic FIFO across sessions) — issue #6.
+    let requestedAt: Date
+
+    init(toolName: String, description: String?, filePath: String?, content: String?,
+         oldString: String?, newString: String?,
+         respond: @escaping (PermissionAction) -> Void,
+         requestedAt: Date = Date()) {
+        self.toolName = toolName
+        self.description = description
+        self.filePath = filePath
+        self.content = content
+        self.oldString = oldString
+        self.newString = newString
+        self.respond = respond
+        self.requestedAt = requestedAt
+    }
 }
 
 struct PendingQuestion {
     let questions: [QuestionItem]
     /// Respond with raw JSON data to write to the socket
     let respond: (Data) -> Void
+    let requestedAt: Date
+
+    init(questions: [QuestionItem], respond: @escaping (Data) -> Void, requestedAt: Date = Date()) {
+        self.questions = questions
+        self.respond = respond
+        self.requestedAt = requestedAt
+    }
 }
 
 struct QuestionItem: Identifiable {

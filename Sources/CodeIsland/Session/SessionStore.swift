@@ -130,12 +130,26 @@ final class SessionStore: ObservableObject {
 
         // If a new event arrives while a permission/question is still pending,
         // the user must have answered it via the terminal — dismiss the notch.
+        // Critical: capture the respond closures BEFORE clearing pending state
+        // and invoke them with safe defaults so the socket fd closes and the
+        // bridge unblocks. Dropping the closures without invoking them leaks
+        // the fd and leaves the bridge in read() for 300s (issue #2).
         let isProgressEvent = ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"].contains(message.hookEvent)
         if isProgressEvent {
-            let hadPending = (sessions[sessionId]?.pendingPermission != nil) || (sessions[sessionId]?.pendingQuestion != nil)
-            if hadPending {
+            let droppedPermission = sessions[sessionId]?.pendingPermission
+            let droppedQuestion = sessions[sessionId]?.pendingQuestion
+            if droppedPermission != nil || droppedQuestion != nil {
                 sessions[sessionId]?.pendingPermission = nil
                 sessions[sessionId]?.pendingQuestion = nil
+                // Allow-once for orphaned permissions — the user already
+                // answered in the terminal, so we're just acking the protocol.
+                droppedPermission?.respond(.allowOnce)
+                // For orphaned questions, defer-to-terminal so Claude knows
+                // to fall through to its native prompt. (No-op for Codex
+                // where respond is just a TerminalJumper hook.)
+                if let q = droppedQuestion, let data = BridgeResponse.deferToTerminal() {
+                    q.respond(data)
+                }
                 Log.info("Pending resolved externally for session=\(sessionId.prefix(8)) (event=\(message.hookEvent))")
                 onEvent.send(.pendingDismissedExternally(sessionId))
             }
@@ -207,8 +221,12 @@ final class SessionStore: ObservableObject {
             let toolName = message.toolName ?? "unknown"
             let description = message.toolInput
 
-            // Auto-allow if bypass permissions mode
-            if message.permissionMode == "bypassPermissions" {
+            // Auto-allow if bypass permissions mode — but NOT for
+            // AskUserQuestion. Claude requires updatedInput.answers in the
+            // response; a bare allow() makes the assistant proceed with no
+            // user input. Fall through so the question UI runs (issue #5).
+            if message.permissionMode == "bypassPermissions",
+               toolName != "AskUserQuestion" {
                 Log.info("Bypass mode — auto-allowing \(toolName) for session=\(sessionId.prefix(8))")
                 let response = BridgeResponse.allow()
                 respond?(response)
@@ -434,14 +452,27 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    /// Returns the session ID of the next session with a pending permission, if any.
+    /// Returns the session ID of the next session with a pending permission,
+    /// ordered by enqueue time (oldest first) for deterministic FIFO across
+    /// arbitrary dictionary iteration (issue #6).
     func nextPendingPermission() -> String? {
-        sessions.first(where: { $0.value.pendingPermission != nil })?.key
+        sessions.values
+            .compactMap { s -> (id: String, at: Date)? in
+                guard let p = s.pendingPermission else { return nil }
+                return (s.id, p.requestedAt)
+            }
+            .min(by: { $0.at < $1.at })?.id
     }
 
-    /// Returns the session ID of the next session with a pending question, if any.
+    /// Returns the session ID of the next session with a pending question,
+    /// ordered by enqueue time (oldest first).
     func nextPendingQuestion() -> String? {
-        sessions.first(where: { $0.value.pendingQuestion != nil })?.key
+        sessions.values
+            .compactMap { s -> (id: String, at: Date)? in
+                guard let q = s.pendingQuestion else { return nil }
+                return (s.id, q.requestedAt)
+            }
+            .min(by: { $0.at < $1.at })?.id
     }
 
     /// Defer the pending question to the terminal (Claude Code will prompt there).

@@ -86,11 +86,24 @@ final class NotchWindowController: NSWindowController {
 
     func handleSessionEvent(_ event: SessionEvent) {
         Task { @MainActor in
+            // If the user is mid-decision on another prompt, leave the UI
+            // alone — the queue drain after they respond will pick the next
+            // pending one (sorted by enqueue time). Swapping mid-tap races
+            // the button and applies the wrong decision to the wrong session
+            // (issue #7).
+            let isAlreadyDeciding: Bool = {
+                if case .permission = viewModel.state { return true }
+                if case .question = viewModel.state { return true }
+                return false
+            }()
+
             switch event {
             case .permissionRequested(let sessionId):
+                guard !isAlreadyDeciding else { return }
                 let height = computePermissionHeight(sessionId: sessionId)
                 viewModel.showPermission(sessionId: sessionId, contentHeight: height)
             case .questionAsked(let sessionId):
+                guard !isAlreadyDeciding else { return }
                 viewModel.showQuestion(sessionId: sessionId)
             case .statusChanged(let sessionId, let status) where status == .idle:
                 // Claude finished — show focused notification card
