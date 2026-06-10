@@ -20,12 +20,16 @@ struct FinishedView: View {
                     Image(systemName: settingsStore.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(settingsStore.soundEnabled ? 0.6 : 0.3))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 Button(action: onOpenSettings) {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 14))
                         .foregroundColor(.white.opacity(0.4))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -193,15 +197,21 @@ struct FinishedView: View {
                 )
             }
             .buttonStyle(.plain)
+            .contentShape(Rectangle())
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // No outer onTapGesture — the chrome buttons (sound, gear, Done)
-        // would absorb near-misses and silently jump to the terminal
-        // when the user thought they were dismissing (issue #28). To jump
-        // back to the terminal, users now click the session card area in
-        // the expanded session list instead.
+        // Tap card body → jump to the terminal. The chrome buttons (sound,
+        // gear, Dismiss) have explicit `.contentShape(Rectangle())` on
+        // their labels so SwiftUI's hit testing routes taps to them
+        // before falling through to this outer gesture (issue #28 was
+        // about near-misses absorbing into the outer; we now make the
+        // button hit zones explicit instead of removing the outer).
+        .contentShape(Rectangle())
+        .onTapGesture {
+            TerminalJumper.jump(to: session)
+        }
     }
 
     private func replyMetric(_ reply: String) -> String {
