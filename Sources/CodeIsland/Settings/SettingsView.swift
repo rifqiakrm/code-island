@@ -37,6 +37,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @ObservedObject var settingsStore: SettingsStore
+    @ObservedObject var updateChecker: UpdateChecker
     var onReloadSounds: (() -> Void)? = nil
 
     @State private var selection: SettingsSection = .general
@@ -122,6 +123,46 @@ struct SettingsView: View {
                     Text("Pop the notch open whenever a session is waiting for your approval.")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
+                }
+            }
+        }
+
+        Section("Updates") {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Current version")
+                    Text("v\(updateChecker.currentVersion)" + (updateChecker.latestVersion.map { "  ·  latest on GitHub: v\($0)" } ?? ""))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Button {
+                    Task { await updateChecker.checkForUpdates(showNoUpdateAlert: true) }
+                } label: {
+                    if updateChecker.isChecking {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Check Now")
+                    }
+                }
+                .disabled(updateChecker.isChecking)
+            }
+
+            Toggle(isOn: Binding(
+                get: { updateChecker.autoCheckEnabled },
+                set: { updateChecker.autoCheckEnabled = $0 }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Check for updates weekly")
+                    if let last = updateChecker.lastCheckedAt {
+                        Text("Last checked \(last.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Hasn't checked yet")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }
@@ -236,7 +277,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Code Island")
                         .font(.system(size: 18, weight: .bold))
-                    Text("v1.0.1")
+                    Text("v1.0.2")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.secondary)
                     Text("The notch dashboard for your AI coding agents.")

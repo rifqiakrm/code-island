@@ -9,13 +9,15 @@ final class MenuBarManager {
     private var statusItem: NSStatusItem?
     private let settingsStore: SettingsStore
     private let sessionStore: SessionStore
+    private let updateChecker: UpdateChecker
     private let onQuit: () -> Void
     private let onReloadSounds: () -> Void
     private var settingsWindow: NSWindow?
 
-    init(settingsStore: SettingsStore, sessionStore: SessionStore, onReloadSounds: @escaping () -> Void, onQuit: @escaping () -> Void) {
+    init(settingsStore: SettingsStore, sessionStore: SessionStore, updateChecker: UpdateChecker, onReloadSounds: @escaping () -> Void, onQuit: @escaping () -> Void) {
         self.settingsStore = settingsStore
         self.sessionStore = sessionStore
+        self.updateChecker = updateChecker
         self.onReloadSounds = onReloadSounds
         self.onQuit = onQuit
         setupStatusItem()
@@ -83,7 +85,7 @@ final class MenuBarManager {
             return
         }
 
-        let view = SettingsView(settingsStore: settingsStore, onReloadSounds: onReloadSounds)
+        let view = SettingsView(settingsStore: settingsStore, updateChecker: updateChecker, onReloadSounds: onReloadSounds)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 580),
             styleMask: [.titled, .closable],

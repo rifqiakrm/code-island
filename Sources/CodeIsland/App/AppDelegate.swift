@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
     private let rateLimitStore = RateLimitStore()
     private let codexAppServer = CodexAppServerClient()
+    private let updateChecker = UpdateChecker()
     private var cancellables = Set<AnyCancellable>()
 
     private func log(_ msg: String) {
@@ -97,6 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarManager = MenuBarManager(
             settingsStore: settingsStore,
             sessionStore: sessionStore,
+            updateChecker: updateChecker,
             onReloadSounds: { [weak self] in self?.soundEngine.reloadSounds() },
             onQuit: { NSApp.terminate(nil) }
         )
@@ -138,6 +140,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Show onboarding on first launch
         if !settingsStore.hasCompletedOnboarding {
             showOnboarding()
+        }
+
+        // Auto update check — silent unless a newer release is found, and
+        // runs at most once per week.
+        Task {
+            // Delay a few seconds so the notch is up and the user isn't
+            // greeted by a popup the instant they launch.
+            try? await Task.sleep(for: .seconds(8))
+            await updateChecker.checkOnLaunchIfDue()
         }
     }
 
