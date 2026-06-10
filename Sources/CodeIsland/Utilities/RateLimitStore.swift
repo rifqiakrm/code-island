@@ -11,10 +11,15 @@ struct RateLimit {
     var timeRemaining: String {
         let remaining = resetsAt.timeIntervalSinceNow
         guard remaining > 0 else { return "now" }
-        let hours = Int(remaining) / 3600
-        let minutes = (Int(remaining) % 3600) / 60
-        if hours >= 24 {
-            return "\(hours / 24)d"
+        let total = Int(remaining)
+        let days = total / 86_400
+        let hours = (total % 86_400) / 3600
+        let minutes = (total % 3600) / 60
+        // Keep the next-finer unit visible so 25h59m doesn't collapse to
+        // "1d" (and so the value doesn't appear to jump backwards when
+        // transitioning across the 24h boundary) — issue #39.
+        if days > 0 {
+            return hours > 0 ? "\(days)d\(hours)h" : "\(days)d"
         }
         if hours > 0 {
             return "\(hours)h\(String(format: "%02d", minutes))m"

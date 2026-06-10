@@ -83,15 +83,20 @@ enum ClaudeCredentials {
         }
 
         if let creds = cachedCreds {
+            // Only refresh on .unauthorized — the access token actually
+            // got rejected. For .rateLimited and .otherError the access
+            // token is fine; refreshing would burn a refresh-token
+            // rotation (Anthropic rotates on every call) and race the
+            // Claude CLI, potentially locking the user out (issue #22).
             switch await probe(creds.accessToken, plan) {
             case .success(let u):       return .usage(u)
-            case .rateLimited:          lastError = "rate limited"
-            case .unauthorized:         break
+            case .rateLimited:          return .failed("rate limited")
+            case .unauthorized:         break  // falls through to refresh
             // Refresh hands back tokens with the same scope set, so it cannot
             // recover from a missing-scope 403. Bail out and surface the only
             // remediation that actually works.
             case .scopeInsufficient:    return .reauthRequired(reauthRequiredMessage)
-            case .otherError(let e):    lastError = e
+            case .otherError(let e):    return .failed(e)
             }
 
             if let refreshed = await refreshClaudeToken(refreshToken: creds.refreshToken) {

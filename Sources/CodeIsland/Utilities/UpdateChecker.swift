@@ -50,11 +50,7 @@ final class UpdateChecker: ObservableObject {
     func checkForUpdates(showNoUpdateAlert: Bool) async {
         isChecking = true
         lastError = nil
-        defer {
-            isChecking = false
-            lastCheckedAt = Date()
-            defaults.set(Date(), forKey: lastCheckKey)
-        }
+        defer { isChecking = false }
         do {
             var req = URLRequest(url: releaseURL, timeoutInterval: 12)
             req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -68,6 +64,11 @@ final class UpdateChecker: ObservableObject {
             let parsed = try JSONDecoder().decode(GitHubRelease.self, from: data)
             let tag = stripV(parsed.tagName)
             latestVersion = tag
+            // Persist lastCheckedAt only on a fully successful fetch. A
+            // single flaky-network launch would otherwise suppress update
+            // notifications for the entire 7-day cadence (issue #34).
+            lastCheckedAt = Date()
+            defaults.set(Date(), forKey: lastCheckKey)
             if Self.isNewer(latest: tag, current: currentVersion) {
                 // Always notify on a new version. Suppress only if user
                 // already dismissed THIS specific version.
@@ -95,11 +96,28 @@ final class UpdateChecker: ObservableObject {
         s.hasPrefix("v") || s.hasPrefix("V") ? String(s.dropFirst()) : s
     }
 
-    /// Lexicographic dotted-number compare. "1.10.0" > "1.9.0", "2.0.0" > "1.99.0".
-    /// Non-numeric segments fall back to string compare so we degrade gracefully.
+    /// SemVer-aware version comparison. Splits each version on `-` into a
+    /// numeric core (`MAJOR.MINOR.PATCH`) and an optional pre-release tail.
+    /// Core segments compare numerically (so "1.10.0" > "1.9.0"). When the
+    /// cores tie, a version *without* a pre-release tail outranks one
+    /// with — `1.0.0` > `1.0.0-beta`, and `1.0.0-beta` is NOT newer than
+    /// `1.0.0` (issue #21).
     static func isNewer(latest: String, current: String) -> Bool {
-        let lp = latest.split(separator: ".").map { String($0) }
-        let cp = current.split(separator: ".").map { String($0) }
+        func split(_ s: String) -> (core: String, pre: String?) {
+            if let dashIdx = s.firstIndex(of: "-") {
+                let core = String(s[..<dashIdx])
+                let pre = String(s[s.index(after: dashIdx)...])
+                return (core, pre.isEmpty ? nil : pre)
+            }
+            return (s, nil)
+        }
+
+        let (lCore, lPre) = split(latest)
+        let (cCore, cPre) = split(current)
+
+        // Compare cores segment by segment, numerically when possible.
+        let lp = lCore.split(separator: ".").map(String.init)
+        let cp = cCore.split(separator: ".").map(String.init)
         for i in 0..<max(lp.count, cp.count) {
             let l = i < lp.count ? lp[i] : "0"
             let c = i < cp.count ? cp[i] : "0"
@@ -109,7 +127,13 @@ final class UpdateChecker: ObservableObject {
                 return l > c
             }
         }
-        return false
+        // Cores equal — handle pre-release precedence
+        switch (lPre, cPre) {
+        case (nil, nil):  return false              // 1.0.0 vs 1.0.0
+        case (nil, _):    return true               // 1.0.0 vs 1.0.0-beta → latest is newer
+        case (_, nil):    return false              // 1.0.0-beta vs 1.0.0 → pre-release is NOT newer
+        case let (l?, c?): return l > c             // identifier compare
+        }
     }
 
     // MARK: - Alerts
