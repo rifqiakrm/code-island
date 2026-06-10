@@ -110,6 +110,20 @@ struct Session: Identifiable {
     /// the agent has exited so we can clean up the session — agents don't
     /// always fire SessionEnd reliably (Codex doesn't, for example).
     var agentPid: Int?
+    /// Recorded start time of `agentPid` (sec, usec). Used to detect PID
+    /// reuse: kill(pid, 0) returning 0 isn't enough — the kernel can
+    /// recycle pids in seconds. If the live process's start time doesn't
+    /// match what we recorded, the original agent is gone (issue #29).
+    var agentStartSec: Int?
+    var agentStartUsec: Int?
+    /// True once we've emitted `.sessionStarted` for this session — guards
+    /// against double-emit when applyCodexThreads and the SessionStart hook
+    /// both arrive (issue #37).
+    var announced: Bool = false
+    /// True when cwd is still the placeholder ("~") and any specific cwd
+    /// from a later event should overwrite it (issue #38). Cleared on first
+    /// real assignment.
+    var cwdIsPlaceholder: Bool = true
 
     /// Resolved provider object for theming/grouping.
     var provider: AIProvider { AIProvider.from(source) }

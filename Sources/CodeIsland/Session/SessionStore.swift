@@ -25,6 +25,12 @@ final class SessionStore: ObservableObject {
     /// while genuinely-exited sessions get removed quickly.
     private var processSweepTimer: Timer?
 
+    /// In-flight removal tasks keyed by session id. A late event can cancel
+    /// the pending removal and re-activate the session, instead of having
+    /// the timer fire and silently delete a freshly-recreated session with
+    /// the same id (issues #8, #9, #10).
+    private var pendingRemovals: [String: Task<Void, Never>] = [:]
+
     init() {
         processSweepTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.sweepClosedAgents() }
@@ -56,30 +62,86 @@ final class SessionStore: ObservableObject {
 
             var shouldClose = false
 
-            // Strategy 1: PID probe (works for Claude)
+            // Strategy 1: PID probe — also check process start time so we
+            // don't keep a dead session alive forever because the kernel
+            // recycled the pid to some unrelated process (issue #29).
             if let pid = session.agentPid {
                 let result = kill(pid_t(pid), 0)
                 if result != 0 && errno == ESRCH {
                     shouldClose = true
+                } else if let startSec = session.agentStartSec,
+                          let startUsec = session.agentStartUsec,
+                          let now = Self.processStartTime(pid: pid_t(pid)),
+                          (Int(now.tv_sec) != startSec || Int(now.tv_usec) != startUsec) {
+                    // PID is alive but it's a different process now.
+                    shouldClose = true
                 }
             }
 
-            // Strategy 2: inactivity timeout (Codex only — PID is unreliable)
-            if !shouldClose && session.source == "codex" {
+            // Strategy 2: inactivity timeout (Codex only — PID is unreliable
+            // because hooks route through a long-lived daemon). Skip when
+            // a tool is in flight — Codex emits PreToolUse then nothing
+            // until PostToolUse, and we'd kill the session mid-tool on
+            // anything that takes more than 5 minutes (issue #11).
+            if !shouldClose && session.source == "codex" && session.status == .idle {
                 if now.timeIntervalSince(session.lastActivityAt) > codexIdleThreshold {
                     shouldClose = true
                 }
             }
 
             if shouldClose {
-                sessions[id]?.status = .completed
-                onEvent.send(.sessionEnded(id))
-                Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(2))
-                    await MainActor.run { self?.sessions.removeValue(forKey: id) }
+                markCompletedAndScheduleRemoval(sessionId: id, after: 2.0)
+            }
+        }
+    }
+
+    // MARK: - Removal helpers
+
+    /// Mark the session completed, emit `sessionEnded`, and schedule its
+    /// removal after `delay`. A late hook arrival within `delay` cancels
+    /// the removal and resurrects the session via `handleLateEvent`.
+    private func markCompletedAndScheduleRemoval(sessionId: String, after delay: TimeInterval) {
+        guard sessions[sessionId]?.status != .completed else { return }
+        sessions[sessionId]?.status = .completed
+        onEvent.send(.sessionEnded(sessionId))
+        scheduleRemoval(sessionId: sessionId, after: delay)
+    }
+
+    private func scheduleRemoval(sessionId: String, after delay: TimeInterval) {
+        pendingRemovals[sessionId]?.cancel()
+        pendingRemovals[sessionId] = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            await MainActor.run {
+                guard let self else { return }
+                self.pendingRemovals.removeValue(forKey: sessionId)
+                // Re-check completed — a brand-new session with the same id
+                // (Claude --resume, Codex thread reuse) will have status
+                // reset to .idle / .thinking by ensureSession + handleMessage.
+                if self.sessions[sessionId]?.status == .completed {
+                    self.sessions.removeValue(forKey: sessionId)
                 }
             }
         }
+    }
+
+    private func cancelPendingRemoval(sessionId: String) {
+        pendingRemovals[sessionId]?.cancel()
+        pendingRemovals.removeValue(forKey: sessionId)
+    }
+
+    /// Returns the start time of the process at `pid`, or nil if it's
+    /// unreadable. Used to detect PID reuse alongside `kill(pid, 0)`.
+    private static func processStartTime(pid: pid_t) -> timeval? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.size
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        let result = withUnsafeMutablePointer(to: &mib[0]) { mibPtr in
+            sysctl(mibPtr, 4, &info, &size, nil, 0)
+        }
+        if result == 0 {
+            return info.kp_proc.p_starttime
+        }
+        return nil
     }
 
     var activeSessions: [String: Session] {
@@ -89,14 +151,24 @@ final class SessionStore: ObservableObject {
     private func ensureSession(_ message: BridgeMessage) {
         let sessionId = message.sessionId
         if sessions[sessionId] == nil {
-            sessions[sessionId] = Session(
+            let cwd = message.cwd ?? "~"
+            var s = Session(
                 id: sessionId,
-                cwd: message.cwd ?? "~",
+                cwd: cwd,
                 startedAt: Date(),
                 status: .idle,
                 terminalInfo: message.terminalInfo,
                 source: message.source ?? "claude"
             )
+            s.cwdIsPlaceholder = (message.cwd == nil)
+            s.announced = true
+            sessions[sessionId] = s
+            onEvent.send(.sessionStarted(sessionId))
+        } else if let cwd = message.cwd, !cwd.isEmpty,
+                  sessions[sessionId]?.cwdIsPlaceholder == true {
+            // First real cwd arrives after a placeholder create (issue #38).
+            sessions[sessionId]?.cwd = cwd
+            sessions[sessionId]?.cwdIsPlaceholder = false
         }
         // Update terminal info / source if newer info arrives
         if let info = message.terminalInfo {
@@ -110,6 +182,15 @@ final class SessionStore: ObservableObject {
     func handleMessage(_ message: BridgeMessage, respond: ((BridgeResponse) -> Void)?, respondRaw: ((Data) -> Void)? = nil) {
         let sessionId = message.sessionId
         ensureSession(message)
+        // A late buffered hook may arrive after we've marked a session
+        // .completed and scheduled removal. Cancel the pending removal so
+        // the brand-new session (Claude resume / Codex thread reuse) isn't
+        // deleted out from under us, and reset .completed back to .idle so
+        // the per-event switch below can transition normally (issue #10).
+        if sessions[sessionId]?.status == .completed {
+            cancelPendingRemoval(sessionId: sessionId)
+            sessions[sessionId]?.status = .idle
+        }
         // Stamp activity time on every event so the collapsed notch tracks
         // whatever provider is most recently doing something.
         sessions[sessionId]?.lastActivityAt = Date()
@@ -123,9 +204,17 @@ final class SessionStore: ObservableObject {
         if let title = message.sessionTitle, !title.isEmpty {
             sessions[sessionId]?.sessionTitle = title
         }
-        // Capture the agent PID — used to detect when the agent exits
+        // Capture the agent PID — used to detect when the agent exits.
+        // Also stamp its start time so PID reuse can be detected later
+        // (issue #29).
         if let pid = message.agentPid, pid > 0 {
-            sessions[sessionId]?.agentPid = pid
+            if sessions[sessionId]?.agentPid != pid {
+                sessions[sessionId]?.agentPid = pid
+                if let start = Self.processStartTime(pid: pid_t(pid)) {
+                    sessions[sessionId]?.agentStartSec = Int(start.tv_sec)
+                    sessions[sessionId]?.agentStartUsec = Int(start.tv_usec)
+                }
+            }
         }
 
         // If a new event arrives while a permission/question is still pending,
@@ -158,15 +247,17 @@ final class SessionStore: ObservableObject {
         switch message.hookEvent {
         case "SessionStart":
             sessions[sessionId]?.status = .idle
-            onEvent.send(.sessionStarted(sessionId))
+            // ensureSession already emitted .sessionStarted for first-time
+            // creates. Suppress the redundant SessionStart-hook emit so
+            // subscribers (sounds, metrics) see exactly one start per id
+            // (issue #37).
+            if sessions[sessionId]?.announced == false {
+                sessions[sessionId]?.announced = true
+                onEvent.send(.sessionStarted(sessionId))
+            }
 
         case "SessionEnd":
-            sessions[sessionId]?.status = .completed
-            onEvent.send(.sessionEnded(sessionId))
-            Task {
-                try? await Task.sleep(for: .seconds(5))
-                sessions.removeValue(forKey: sessionId)
-            }
+            markCompletedAndScheduleRemoval(sessionId: sessionId, after: 5.0)
 
         case "UserPromptSubmit":
             let userMsg = message.userMessage ?? message.toolInput
@@ -426,16 +517,20 @@ final class SessionStore: ObservableObject {
         // Create sessions for newly-discovered threads.
         for (id, info) in infos {
             if sessions[id] == nil {
-                sessions[id] = Session(
+                let cwd = info.cwd ?? "~"
+                var s = Session(
                     id: id,
-                    cwd: info.cwd ?? "~",
+                    cwd: cwd,
                     startedAt: Date(),
                     status: .idle,
                     source: "codex"
                 )
+                s.cwdIsPlaceholder = (info.cwd == nil)
+                s.announced = true
                 if let name = info.name, !name.isEmpty {
-                    sessions[id]?.sessionTitle = name
+                    s.sessionTitle = name
                 }
+                sessions[id] = s
                 onEvent.send(.sessionStarted(id))
             } else {
                 // Update title for existing sessions if we got a name.
@@ -445,8 +540,12 @@ final class SessionStore: ObservableObject {
                         sessions[id]?.sessionTitle = name
                     }
                 }
-                if let cwd = info.cwd, !cwd.isEmpty, sessions[id]?.cwd == "~" {
+                // Apply a real cwd if we still have only the placeholder
+                // (issue #38).
+                if let cwd = info.cwd, !cwd.isEmpty,
+                   sessions[id]?.cwdIsPlaceholder == true {
                     sessions[id]?.cwd = cwd
+                    sessions[id]?.cwdIsPlaceholder = false
                 }
             }
         }
