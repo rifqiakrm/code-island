@@ -277,7 +277,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Code Island")
                         .font(.system(size: 18, weight: .bold))
-                    Text("v1.0.2")
+                    Text("v1.0.3")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundColor(.secondary)
                     Text("The notch dashboard for your AI coding agents.")

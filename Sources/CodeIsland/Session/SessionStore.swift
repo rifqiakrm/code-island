@@ -35,16 +35,43 @@ final class SessionStore: ObservableObject {
         processSweepTimer?.invalidate()
     }
 
-    /// Marks sessions whose agent process has exited as ended, then removes them.
-    /// Uses `kill(pid, 0)` which probes whether the process exists without
-    /// actually sending a signal — returns -1 with errno=ESRCH if it's gone.
+    /// Marks sessions whose agent has exited as ended, then removes them.
+    ///
+    /// Two detection strategies, used in parallel:
+    ///   1. PID probe via `kill(pid, 0)` — reliable for Claude, where the
+    ///      hook bridge's `getppid()` returns the agent's own short-lived
+    ///      process. Returns -1 with errno=ESRCH when the process is gone.
+    ///   2. Codex-only inactivity timeout — Codex routes hooks through a
+    ///      persistent `app-server` daemon (the bridge's parent is always
+    ///      that long-lived process), so PID detection never fires. If a
+    ///      Codex session goes 5+ minutes without ANY hook, we treat it as
+    ///      ended. 5 minutes is conservative enough that an actively-used
+    ///      session won't be killed even mid-tool-call.
     private func sweepClosedAgents() {
+        let codexIdleThreshold: TimeInterval = 5 * 60
+        let now = Date()
+
         for (id, session) in sessions {
-            guard let pid = session.agentPid else { continue }
-            let result = kill(pid_t(pid), 0)
-            if result != 0 && errno == ESRCH {
-                // Agent process is gone — clean up
-                guard session.status != .completed else { continue }
+            guard session.status != .completed else { continue }
+
+            var shouldClose = false
+
+            // Strategy 1: PID probe (works for Claude)
+            if let pid = session.agentPid {
+                let result = kill(pid_t(pid), 0)
+                if result != 0 && errno == ESRCH {
+                    shouldClose = true
+                }
+            }
+
+            // Strategy 2: inactivity timeout (Codex only — PID is unreliable)
+            if !shouldClose && session.source == "codex" {
+                if now.timeIntervalSince(session.lastActivityAt) > codexIdleThreshold {
+                    shouldClose = true
+                }
+            }
+
+            if shouldClose {
                 sessions[id]?.status = .completed
                 onEvent.send(.sessionEnded(id))
                 Task { [weak self] in
