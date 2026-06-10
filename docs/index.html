@@ -34,7 +34,7 @@
   <!-- HERO -->
   <header class="hero" id="top">
     <div class="hero-inner">
-      <span class="eyebrow">v1.0.0 · macOS 14+ · Open source</span>
+      <span class="eyebrow">v1.0.2 · macOS 14+ · Open source</span>
       <h1>Your AI coding agents,<br/><span class="accent">live in the notch.</span></h1>
       <p class="subtitle">
         Monitor sessions, approve permissions, answer questions, and jump back to your terminal —<br/>
@@ -373,7 +373,12 @@
         <article class="feature">
           <div class="ico">⏻</div>
           <h3>Smart cleanup</h3>
-          <p>Process-PID-based session cleanup catches Codex's missing <code>SessionEnd</code>. Long-idle Claude sessions stay open as long as the agent does.</p>
+          <p>Process-PID sweep removes Claude sessions when the agent exits. For Codex we listen to the app-server's <code>thread/closed</code> events — works for both CLI and Codex.app.</p>
+        </article>
+        <article class="feature">
+          <div class="ico">↻</div>
+          <h3>Auto updates</h3>
+          <p>Weekly silent check against GitHub Releases. Pops an alert only when a newer version ships. Skip a release once and we won't nag again.</p>
         </article>
         <article class="feature">
           <div class="ico">⌗</div>
