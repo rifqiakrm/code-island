@@ -210,9 +210,17 @@ if let durationMs = payload["duration_ms"] as? Int { message["duration_ms"] = du
 // Serialize
 guard let messageData = try? JSONSerialization.data(withJSONObject: message) else { exit(1) }
 
+// SIGPIPE → ignored. We'd rather have write() return EPIPE so we can
+// exit cleanly than have the kernel deliver a signal we don't handle.
+signal(SIGPIPE, SIG_IGN)
+
 // Connect to Unix socket
 let fd = socket(AF_UNIX, SOCK_STREAM, 0)
 guard fd >= 0 else { exit(1) }
+
+// Per-socket SIGPIPE suppression — belt-and-braces with the signal handler.
+var noSigPipe: Int32 = 1
+setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, socklen_t(MemoryLayout<Int32>.size))
 
 var addr = sockaddr_un()
 addr.sun_family = sa_family_t(AF_UNIX)
@@ -234,44 +242,76 @@ guard connected == 0 else {
     exit(1)
 }
 
-// Send message — loop write until all bytes are sent (write() can return
-// less than requested when the socket buffer is full, which happens with
-// large payloads like long Bash commands).
-messageData.withUnsafeBytes { rawPtr in
-    let base = rawPtr.bindMemory(to: UInt8.self).baseAddress!
+// MARK: - Framed I/O helpers
+
+func writeAll(fd: Int32, bytes: UnsafePointer<UInt8>, count: Int) -> Bool {
     var sent = 0
-    while sent < messageData.count {
-        let n = write(fd, base.advanced(by: sent), messageData.count - sent)
-        if n <= 0 { break }
-        sent += n
+    while sent < count {
+        let n = write(fd, bytes.advanced(by: sent), count - sent)
+        if n > 0 {
+            sent += n
+        } else if errno == EINTR {
+            continue
+        } else {
+            return false
+        }
+    }
+    return true
+}
+
+func writeFramed(fd: Int32, payload: Data) -> Bool {
+    let len = UInt32(payload.count)
+    let header: [UInt8] = [
+        UInt8((len >> 24) & 0xFF),
+        UInt8((len >> 16) & 0xFF),
+        UInt8((len >> 8) & 0xFF),
+        UInt8(len & 0xFF),
+    ]
+    let okHeader = header.withUnsafeBufferPointer { writeAll(fd: fd, bytes: $0.baseAddress!, count: 4) }
+    guard okHeader else { return false }
+    return payload.withUnsafeBytes { raw -> Bool in
+        guard let base = raw.baseAddress else { return false }
+        return writeAll(fd: fd, bytes: base.assumingMemoryBound(to: UInt8.self), count: payload.count)
     }
 }
 
-// For non-permission events, half-close the write side so the app knows
-// the message is complete (its read loop can exit immediately on EOF
-// instead of waiting for the 1s read timeout).
-if hookEvent != "PermissionRequest" {
-    shutdown(fd, SHUT_WR)
+func readExactly(fd: Int32, count: Int) -> Data? {
+    var buf = Data(count: count)
+    var got = 0
+    let ok = buf.withUnsafeMutableBytes { raw -> Bool in
+        guard let base = raw.baseAddress else { return false }
+        while got < count {
+            let n = read(fd, base.advanced(by: got), count - got)
+            if n > 0 { got += n }
+            else if n == 0 { return false }
+            else if errno == EINTR { continue }
+            else { return false }
+        }
+        return true
+    }
+    return ok ? buf : nil
 }
 
-// For permission requests, wait for response
+// Send length-prefixed JSON
+guard writeFramed(fd: fd, payload: messageData) else {
+    close(fd)
+    exit(1)
+}
+
+// For permission requests, wait for framed response
 if hookEvent == "PermissionRequest" {
     var timeout = timeval(tv_sec: 300, tv_usec: 0)
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
-    // Read all bytes — response may come in multiple chunks
-    var responseData = Data()
-    var buffer = [UInt8](repeating: 0, count: 65536)
-    while true {
-        let bytesRead = read(fd, &buffer, buffer.count)
-        if bytesRead <= 0 { break }
-        responseData.append(Data(bytes: buffer, count: bytesRead))
-        // Check if it looks like complete JSON (last char is })
-        if responseData.last == 0x7D /* } */ { break }
+    guard let header = readExactly(fd: fd, count: 4) else {
+        close(fd); exit(1)
     }
-
-    if !responseData.isEmpty {
-        FileHandle.standardOutput.write(responseData)
+    let len: UInt32 = header.withUnsafeBytes { raw in
+        let p = raw.bindMemory(to: UInt8.self)
+        return (UInt32(p[0]) << 24) | (UInt32(p[1]) << 16) | (UInt32(p[2]) << 8) | UInt32(p[3])
+    }
+    if len > 0, len <= 4 * 1024 * 1024, let body = readExactly(fd: fd, count: Int(len)) {
+        FileHandle.standardOutput.write(body)
         try? FileHandle.standardOutput.synchronize()
     }
 }
