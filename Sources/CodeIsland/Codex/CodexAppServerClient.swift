@@ -42,9 +42,21 @@ final class CodexAppServerClient: ObservableObject {
 
     private var process: Process?
     private var stdoutPipe: Pipe?
+    private var stderrPipe: Pipe?
     private var buffer = Data()
     private var relaunchTask: Task<Void, Never>?
     private var stopped = false
+
+    /// Generation token incremented on every spawn. Stale stdout/stderr
+    /// readability handlers from a dead child compare against this and
+    /// no-op if it's changed (issue #16).
+    private var generation: Int = 0
+
+    /// Spawn-failure tracking for exponential backoff (issue #14).
+    private var consecutiveQuickFailures: Int = 0
+    private var lastSpawnAt: Date = .distantPast
+    /// Once we've hit this many sub-1s lifetimes in a row, stop trying.
+    private let maxConsecutiveQuickFailures = 10
 
     /// Common install paths for the `codex` CLI in priority order. Mirrors the
     /// approach the reference repo uses for the Claude CLI — we deliberately
@@ -96,6 +108,10 @@ final class CodexAppServerClient: ObservableObject {
             return
         }
         NSLog("[CodeIsland] Spawning codex app-server from \(executablePath)")
+        generation += 1
+        let gen = generation
+        lastSpawnAt = Date()
+
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executablePath)
         task.arguments = ["app-server"]
@@ -109,17 +125,28 @@ final class CodexAppServerClient: ObservableObject {
         // doesn't block trying to talk to a closed handle.
         task.standardInput = Pipe()
 
+        // Drain stderr so the child doesn't deadlock when its pipe buffer
+        // fills (issue #15). Stale handlers from a previous spawn check the
+        // generation token and no-op (issue #16).
         stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
             Task { @MainActor [weak self] in
-                self?.ingest(data: data)
+                guard let self, self.generation == gen else { return }
+                self.ingest(data: data)
+            }
+        }
+        stderr.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else { return }
+            if let s = String(data: data, encoding: .utf8) {
+                NSLog("[codex app-server stderr] %@", s.trimmingCharacters(in: .whitespacesAndNewlines))
             }
         }
 
         task.terminationHandler = { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.handleTermination()
+                self?.handleTermination(gen: gen)
             }
         }
 
@@ -127,20 +154,82 @@ final class CodexAppServerClient: ObservableObject {
             try task.run()
             self.process = task
             self.stdoutPipe = stdout
+            self.stderrPipe = stderr
+            sendInitializeHandshake()
         } catch {
             NSLog("[CodeIsland] Failed to spawn codex app-server: \(error.localizedDescription)")
         }
     }
 
-    private func handleTermination() {
-        process = nil
+    /// Send `initialize` request + `initialized` notification per the
+    /// Codex JSON-RPC schema. Without this handshake some app-server
+    /// builds keep notifications gated and the threads dict stays empty
+    /// (issue #36).
+    private func sendInitializeHandshake() {
+        guard let stdin = (process?.standardInput as? Pipe)?.fileHandleForWriting else { return }
+        let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.1.0"
+        let initRequest: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": [
+                "clientInfo": [
+                    "name": "code-island",
+                    "title": "Code Island",
+                    "version": version
+                ]
+            ]
+        ]
+        let initializedNote: [String: Any] = [
+            "jsonrpc": "2.0",
+            "method": "initialized",
+            "params": [:]
+        ]
+        for msg in [initRequest, initializedNote] {
+            guard let data = try? JSONSerialization.data(withJSONObject: msg) else { continue }
+            try? stdin.write(contentsOf: data)
+            try? stdin.write(contentsOf: Data([0x0A]))  // newline terminator
+        }
+    }
+
+    private func handleTermination(gen: Int) {
+        // Ignore terminations from a stale generation — handleTermination
+        // can race with a fresh spawn if Foundation dispatches the prior
+        // child's handler after we've already replaced it.
+        guard gen == generation else { return }
+
+        // Detach the readability handlers explicitly so the old FileHandle's
+        // closures can be released and don't bleed bytes from this dead
+        // child into the buffer of the next spawn (issue #16).
+        stdoutPipe?.fileHandleForReading.readabilityHandler = nil
+        stderrPipe?.fileHandleForReading.readabilityHandler = nil
         stdoutPipe = nil
+        stderrPipe = nil
+        process = nil
         buffer.removeAll()
+
         guard !stopped else { return }
-        // Relaunch after a short delay so we don't burn CPU on a crashing binary.
+
+        // Exponential backoff with a quick-failure cap (issue #14). Lifetime
+        // less than 30s counts as a quick failure; otherwise reset. After N
+        // consecutive quick failures we give up to avoid a tight fork loop
+        // when the binary is broken.
+        let lifetime = Date().timeIntervalSince(lastSpawnAt)
+        if lifetime < 30 {
+            consecutiveQuickFailures += 1
+        } else {
+            consecutiveQuickFailures = 0
+        }
+        if consecutiveQuickFailures >= maxConsecutiveQuickFailures {
+            NSLog("[CodeIsland] codex app-server has died %d times in a row — giving up", consecutiveQuickFailures)
+            return
+        }
+
+        let delaySeconds = min(pow(2.0, Double(consecutiveQuickFailures)) * 5, 300)
+        NSLog("[CodeIsland] codex app-server died (lifetime=%.1fs); relaunching in %.0fs (failure #%d)", lifetime, delaySeconds, consecutiveQuickFailures)
         relaunchTask?.cancel()
         relaunchTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(5))
+            try? await Task.sleep(for: .seconds(delaySeconds))
             guard let self, !self.stopped else { return }
             self.spawn()
         }
