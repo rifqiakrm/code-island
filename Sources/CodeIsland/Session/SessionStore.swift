@@ -349,6 +349,23 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    /// Called when the Codex app-server reports a thread/closed event.
+    /// The bridge can't detect this on its own — Codex CLI/GUI both route
+    /// hooks through the long-lived daemon, so `agent_pid` always points at
+    /// a process that never dies. The daemon's JSON-RPC stream is the only
+    /// reliable signal that a Codex session has actually ended.
+    func handleCodexThreadClosed(_ threadId: String) {
+        guard let session = sessions[threadId] else { return }
+        guard session.source == "codex" else { return }
+        guard session.status != .completed else { return }
+        sessions[threadId]?.status = .completed
+        onEvent.send(.sessionEnded(threadId))
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            await MainActor.run { self?.sessions.removeValue(forKey: threadId) }
+        }
+    }
+
     /// Mirror the app-server thread stream into proper Session records.
     ///
     /// Codex doesn't fire a SessionStart hook on `codex resume <id>` — hooks

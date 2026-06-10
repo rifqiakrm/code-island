@@ -34,6 +34,12 @@ final class CodexAppServerClient: ObservableObject {
         threads.mapValues { $0.name ?? "" }.filter { !$0.value.isEmpty }
     }
 
+    /// Fires with each thread id the daemon reports as closed/archived.
+    /// SessionStore subscribes to clean up sessions — necessary because the
+    /// bridge's `agent_pid` for Codex points at the never-dying daemon, so
+    /// process-PID sweeps can't detect when a Codex thread has actually ended.
+    let closedThreadIds = PassthroughSubject<String, Never>()
+
     private var process: Process?
     private var stdoutPipe: Pipe?
     private var buffer = Data()
@@ -174,12 +180,17 @@ final class CodexAppServerClient: ObservableObject {
                 info.cwd = cwd
             }
             threads[id] = info
-        case "thread/closed":
-            if let id = params["threadId"] as? String {
+        case "thread/closed", "thread/archived":
+            let closedId: String? = {
+                if let id = params["threadId"] as? String { return id }
+                if let thread = params["thread"] as? [String: Any],
+                   let id = thread["id"] as? String { return id }
+                return nil
+            }()
+            if let id = closedId {
                 threads.removeValue(forKey: id)
-            } else if let thread = params["thread"] as? [String: Any],
-                      let id = thread["id"] as? String {
-                threads.removeValue(forKey: id)
+                closedThreadIds.send(id)
+                NSLog("[CodeIsland] Codex thread closed: \(id)")
             }
         default:
             break
