@@ -121,7 +121,7 @@ struct NotchContentView: View {
                     session: session,
                     question: question,
                     onSubmit: { answers in
-                        sessionStore.respondToQuestion(sessionId: sessionId, answer: answers)
+                        sessionStore.respondToQuestion(sessionId: sessionId, answersByQuestionId: answers)
                         let store = sessionStore
                         if let next = store.nextPendingPermission() {
                             let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }

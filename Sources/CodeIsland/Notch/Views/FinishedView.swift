@@ -197,10 +197,11 @@ struct FinishedView: View {
             .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            TerminalJumper.jump(to: session)
-        }
+        // No outer onTapGesture — the chrome buttons (sound, gear, Done)
+        // would absorb near-misses and silently jump to the terminal
+        // when the user thought they were dismissing (issue #28). To jump
+        // back to the terminal, users now click the session card area in
+        // the expanded session list instead.
     }
 
     private func replyMetric(_ reply: String) -> String {

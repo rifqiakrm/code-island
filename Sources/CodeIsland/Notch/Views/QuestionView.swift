@@ -3,7 +3,10 @@ import SwiftUI
 struct QuestionView: View {
     let session: Session
     let question: PendingQuestion
-    let onSubmit: (String) -> Void
+    /// Answer payload is keyed by question.id. For multi-select, value is
+    /// comma-joined option labels. Switching from a single delimited string
+    /// to a structured dict avoids `|`-collision (issue #26).
+    let onSubmit: ([String: String]) -> Void
     let onDeferToTerminal: () -> Void
     @ObservedObject var rateLimitStore: RateLimitStore
     @ObservedObject var settingsStore: SettingsStore
@@ -93,44 +96,68 @@ struct QuestionView: View {
                     }
                 }
 
-                HStack(spacing: 10) {
+                // For Codex, hook-side answer substitution isn't supported
+                // — the only way to actually answer is in Codex.app. Hide
+                // the Submit button (which would silently discard the
+                // user's answer — issue #25) and relabel the defer button
+                // to make the intent clear.
+                if session.source == "codex" {
                     Button(action: onDeferToTerminal) {
                         HStack(spacing: 7) {
-                            Image(systemName: "terminal")
+                            Image(systemName: "arrow.up.right.square.fill")
                                 .font(.system(size: 12))
-                            Text("Answer in terminal")
-                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        }
-                        .foregroundColor(.white.opacity(0.8))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(.white.opacity(0.06))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .strokeBorder(.white.opacity(0.18), lineWidth: 1)
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: submit) {
-                        HStack(spacing: 7) {
-                            Image(systemName: "paperplane.fill")
-                                .font(.system(size: 11))
-                            Text("Submit Answer")
+                            Text("Open Codex to answer")
                                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                         }
-                        .foregroundColor(hasAnyAnswer ? .black : .white.opacity(0.4))
+                        .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(hasAnyAnswer ? Color.cyan : Color.white.opacity(0.06))
+                                .fill(Color.cyan)
                         )
                     }
                     .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: 10) {
+                        Button(action: onDeferToTerminal) {
+                            HStack(spacing: 7) {
+                                Image(systemName: "terminal")
+                                    .font(.system(size: 12))
+                                Text("Answer in terminal")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            }
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(.white.opacity(0.06))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: submit) {
+                            HStack(spacing: 7) {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 11))
+                                Text("Submit Answer")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            }
+                            .foregroundColor(hasAnyAnswer ? .black : .white.opacity(0.4))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(hasAnyAnswer ? Color.cyan : Color.white.opacity(0.06))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -263,13 +290,20 @@ struct QuestionView: View {
             showWarning = true
             return
         }
-        // For each question, prefer custom answer if non-empty, else joined selections
-        let combined = question.questions.map { q -> String in
+        // Build a structured per-question dict — no delimiter is needed and
+        // user input containing `|` or `,` survives intact (issue #26).
+        // Claude's documented multi-select format is comma-no-space, so we
+        // use "," (not ", ") to match.
+        var answers: [String: String] = [:]
+        for q in question.questions {
             let custom = (customAnswers[q.id] ?? "").trimmingCharacters(in: .whitespaces)
-            if !custom.isEmpty { return custom }
-            return (selections[q.id] ?? []).joined(separator: ", ")
-        }.joined(separator: "|")
-        onSubmit(combined)
+            if !custom.isEmpty {
+                answers[q.id] = custom
+            } else {
+                answers[q.id] = (selections[q.id] ?? []).joined(separator: ",")
+            }
+        }
+        onSubmit(answers)
     }
 }
 

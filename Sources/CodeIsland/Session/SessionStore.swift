@@ -598,26 +598,28 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    /// Called from QuestionView with answers formatted as "answer1|answer2|..."
-    func respondToQuestion(sessionId: String, answer: String) {
+    /// Called from QuestionView with answers keyed by `QuestionItem.id`.
+    /// Multi-select answers come as comma-joined option labels — matches
+    /// Claude Code's documented format.
+    func respondToQuestion(sessionId: String, answersByQuestionId: [String: String]) {
         guard let q = sessions[sessionId]?.pendingQuestion else { return }
 
-        // Parse "answer1|answer2" into a dict mapping question text → selected labels
-        let parts = answer.components(separatedBy: "|")
-        var answersDict: [String: String] = [:]
-        for (index, question) in q.questions.enumerated() {
-            if index < parts.count {
-                answersDict[question.question] = parts[index]
+        // BridgeResponse.allowWithAnswers expects answers keyed by the
+        // question text (Claude's convention), so translate.
+        var answersByText: [String: String] = [:]
+        for question in q.questions {
+            if let v = answersByQuestionId[question.id] {
+                answersByText[question.question] = v
             }
         }
 
-        Log.info("Question answers: \(answersDict)")
+        Log.info("Question answers: \(answersByText)")
 
         // Clear immediately so nextPendingQuestion() won't find it again
         sessions[sessionId]?.pendingQuestion = nil
         sessions[sessionId]?.status = .thinking
 
-        if let data = BridgeResponse.allowWithAnswers(questions: q.questions, answers: answersDict) {
+        if let data = BridgeResponse.allowWithAnswers(questions: q.questions, answers: answersByText) {
             q.respond(data)
         }
     }

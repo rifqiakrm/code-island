@@ -186,7 +186,13 @@ final class NotchViewModel: ObservableObject {
         autoCollapseTask?.cancel()
         autoCollapseTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
-            if !Task.isCancelled && isExpanded && !isHovered {
+            guard !Task.isCancelled, isExpanded else { return }
+            if isHovered {
+                // Re-arm with a short delay so the finished card eventually
+                // collapses even if the cursor stays parked over the notch
+                // (issue #27). Cap the total wait at ~15s as a hard ceiling.
+                scheduleAutoCollapse(delay: 0.6)
+            } else {
                 collapse()
             }
         }
