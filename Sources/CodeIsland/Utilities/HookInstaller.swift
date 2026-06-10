@@ -1,6 +1,14 @@
 import Foundation
 
 /// Installs Code Island hooks into Claude Code's settings.json.
+///
+/// Safety contract:
+/// - If `settings.json` exists but can't be parsed, the installer bails
+///   without overwriting (issue #3). User hand-edited config is sacred.
+/// - Before any overwrite, the previous file is copied to `.bak`.
+/// - We only write when something actually changed (issue #31), so a
+///   no-op launch doesn't dirty the user's git repo.
+/// - Write failures bubble up — `install()` returns `false` (issue #32).
 enum HookInstaller {
     static let bridgePath = "~/.code-island/bin/code-island-bridge"
     static let statusLinePath = "~/.code-island/bin/code-island-statusline"
@@ -12,10 +20,37 @@ enum HookInstaller {
 
         // Create ~/.claude/ dir if needed
         let claudeDir = home.appendingPathComponent(".claude")
-        try? FileManager.default.createDirectory(at: claudeDir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: claudeDir, withIntermediateDirectories: true)
+        } catch {
+            Log.error("HookInstaller: can't create ~/.claude: \(error)")
+            return false
+        }
 
-        // Read existing settings or create empty
-        var settings = readJSON(at: settingsPath) ?? [:]
+        // Distinguish "file missing" (safe to start fresh) from "file present
+        // but malformed" (must not touch). The previous code treated both as
+        // "start from {}" and silently wiped the user's hand-edited config.
+        let fileExists = FileManager.default.fileExists(atPath: settingsPath.path)
+        let existingData: Data?
+        if fileExists {
+            do {
+                existingData = try Data(contentsOf: settingsPath)
+            } catch {
+                Log.error("HookInstaller: \(settingsPath.path) exists but can't read: \(error). Refusing to overwrite.")
+                return false
+            }
+        } else {
+            existingData = nil
+        }
+
+        var settings: [String: Any] = [:]
+        if let data = existingData, !data.isEmpty {
+            guard let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                Log.error("HookInstaller: \(settingsPath.path) is present but not valid JSON. Refusing to overwrite — fix the file by hand or move it aside.")
+                return false
+            }
+            settings = parsed
+        }
 
         // Get or create hooks dict
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
@@ -28,7 +63,6 @@ enum HookInstaller {
 
         let bridgeCommand = home.path + "/.code-island/bin/code-island-bridge"
 
-        // Permission request needs a long timeout
         let permissionHookEvents = ["PermissionRequest"]
 
         for event in hookEvents {
@@ -40,19 +74,45 @@ enum HookInstaller {
 
         settings["hooks"] = hooks
 
-        // Note: we used to install a `statusLine` here to cache rate limits
-        // from Claude Code's status feed. That's now superseded by the HTTP
-        // fetcher in `UsageFetcher`, which works whether Claude is running or
-        // not — so we deliberately don't touch the user's statusLine anymore.
+        // Compare to existing — skip write entirely if nothing changed
+        // (avoids dirtying dotfile repos every launch).
+        let newData: Data
+        do {
+            newData = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted])
+        } catch {
+            Log.error("HookInstaller: failed to serialize settings: \(error)")
+            return false
+        }
+        if let existing = existingData, normalizedJSON(existing) == normalizedJSON(newData) {
+            installBridgeLauncher()
+            return true
+        }
 
-        // Write back
-        writeJSON(settings, to: settingsPath)
+        // Back up existing file before overwriting
+        if let existing = existingData, !existing.isEmpty {
+            let backup = settingsPath.appendingPathExtension("bak")
+            try? existing.write(to: backup, options: .atomic)
+        }
+
+        do {
+            try newData.write(to: settingsPath, options: .atomic)
+        } catch {
+            Log.error("HookInstaller: failed to write \(settingsPath.path): \(error)")
+            return false
+        }
 
         // Install bridge launcher script
         installBridgeLauncher()
 
         print("[CodeIsland] Hooks installed successfully")
         return true
+    }
+
+    /// Re-serialize parsed JSON with stable key order so we can compare two
+    /// blobs semantically (whitespace + key-order independent).
+    private static func normalizedJSON(_ data: Data) -> Data? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        return try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys])
     }
 
     private static func addHookEntry(to hooks: inout [String: Any], event: String, command: String, timeout: Int?) {
@@ -131,22 +191,5 @@ enum HookInstaller {
 
         try? script.write(to: path, atomically: true, encoding: .utf8)
         try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path.path)
-    }
-
-    // MARK: - JSON Helpers
-
-    private static func readJSON(at url: URL) -> [String: Any]? {
-        guard let data = try? Data(contentsOf: url),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-        return json
-    }
-
-    private static func writeJSON(_ json: [String: Any], to url: URL) {
-        guard let data = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]) else {
-            return
-        }
-        try? data.write(to: url, options: .atomic)
     }
 }
