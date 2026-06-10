@@ -96,7 +96,7 @@ enum TerminalJumper {
     // MARK: - Terminal.app (AppleScript — match by cwd in tab title)
 
     private static func jumpTerminalApp(cwd: String) {
-        let folder = (cwd as NSString).lastPathComponent
+        let folder = escapeAppleScriptString((cwd as NSString).lastPathComponent)
         runAppleScript("""
         tell application "Terminal"
             repeat with aWindow in windows
@@ -116,7 +116,7 @@ enum TerminalJumper {
     // MARK: - Ghostty (AppleScript — match window by title)
 
     private static func jumpGhostty(cwd: String) {
-        let folder = (cwd as NSString).lastPathComponent
+        let folder = escapeAppleScriptString((cwd as NSString).lastPathComponent)
         runAppleScript("""
         tell application "System Events"
             tell process "Ghostty"
@@ -135,8 +135,8 @@ enum TerminalJumper {
     // MARK: - JetBrains IDEs (AppleScript — match window by project name)
 
     private static func jumpJetBrains(bundleId: String, cwd: String) {
-        let folder = (cwd as NSString).lastPathComponent
-        let appName = appName(for: bundleId)
+        let folder = escapeAppleScriptString((cwd as NSString).lastPathComponent)
+        let appName = escapeAppleScriptString(appName(for: bundleId))
 
         runAppleScript("""
         tell application "System Events"
@@ -156,8 +156,8 @@ enum TerminalJumper {
     // MARK: - VS Code / Cursor / Windsurf (AppleScript — match window by folder name)
 
     private static func jumpVSCode(bundleId: String, cwd: String) {
-        let folder = (cwd as NSString).lastPathComponent
-        let appName = appName(for: bundleId)
+        let folder = escapeAppleScriptString((cwd as NSString).lastPathComponent)
+        let appName = escapeAppleScriptString(appName(for: bundleId))
 
         runAppleScript("""
         tell application "System Events"
@@ -175,6 +175,34 @@ enum TerminalJumper {
     }
 
     // MARK: - Helpers
+
+    /// Sanitize an arbitrary string before splicing it into AppleScript
+    /// source. Without this, a folder name like `foo"; tell app "Finder" to
+    /// delete every file --` would break out of the AppleScript string and
+    /// execute attacker-controlled code with the Accessibility privileges
+    /// Code Island has been granted. `cwd` comes from hook payloads, so a
+    /// malicious project (or an injected transcript) could trigger it
+    /// (issue #20).
+    private static func escapeAppleScriptString(_ raw: String) -> String {
+        // Backslash and double-quote are the two chars AppleScript basic
+        // strings care about. Strip newlines and other control chars
+        // outright — they have no legitimate place in a folder/app name
+        // and would terminate the embedded string anyway.
+        var out = ""
+        out.reserveCapacity(raw.count)
+        for scalar in raw.unicodeScalars {
+            if scalar.value < 0x20 || scalar.value == 0x7F {
+                // skip control chars (including newlines, tabs, NUL)
+                continue
+            }
+            switch scalar {
+            case "\\": out.append("\\\\")
+            case "\"": out.append("\\\"")
+            default: out.append(Character(scalar))
+            }
+        }
+        return out
+    }
 
     private static func runAppleScript(_ source: String) {
         if let script = NSAppleScript(source: source) {
