@@ -5,7 +5,8 @@ extension Notification.Name {
     static let openSettings = Notification.Name("CodeIsland.openSettings")
 }
 
-final class MenuBarManager {
+@MainActor
+final class MenuBarManager: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private let settingsStore: SettingsStore
     private let sessionStore: SessionStore
@@ -20,6 +21,7 @@ final class MenuBarManager {
         self.updateChecker = updateChecker
         self.onReloadSounds = onReloadSounds
         self.onQuit = onQuit
+        super.init()
         setupStatusItem()
         NotificationCenter.default.addObserver(self, selector: #selector(openSettings), name: .openSettings, object: nil)
     }
@@ -33,16 +35,20 @@ final class MenuBarManager {
         }
 
         let menu = NSMenu()
+        menu.delegate = self
+        menu.autoenablesItems = false
 
-        menu.addItem(withTitle: "Code Island", action: nil, keyEquivalent: "")
-        menu.items.last?.isEnabled = false
+        let titleItem = NSMenuItem(title: "Code Island v\(updateChecker.currentVersion)", action: nil, keyEquivalent: "")
+        titleItem.isEnabled = false
+        menu.addItem(titleItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        let sessionsItem = NSMenuItem(title: "No active sessions", action: nil, keyEquivalent: "")
-        sessionsItem.isEnabled = false
-        sessionsItem.tag = 100
-        menu.addItem(sessionsItem)
+        // Sessions list — refreshed in menuWillOpen
+        let sessionsHeader = NSMenuItem(title: "No active sessions", action: nil, keyEquivalent: "")
+        sessionsHeader.isEnabled = false
+        sessionsHeader.tag = TagSessions
+        menu.addItem(sessionsHeader)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -61,6 +67,11 @@ final class MenuBarManager {
         installItem.target = self
         menu.addItem(installItem)
 
+        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updateItem.target = self
+        updateItem.tag = TagUpdate
+        menu.addItem(updateItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(title: "Quit Code Island", action: #selector(quit), keyEquivalent: "q")
@@ -69,6 +80,53 @@ final class MenuBarManager {
 
         statusItem?.menu = menu
     }
+
+    // MARK: - NSMenuDelegate
+
+    /// Rebuild the sessions block right before the menu shows so the count
+    /// reflects current state — the initial menu is built once and would
+    /// otherwise stay frozen at "No active sessions".
+    func menuWillOpen(_ menu: NSMenu) {
+        refreshSessionsSection(menu: menu)
+        refreshUpdateItem(menu: menu)
+    }
+
+    private func refreshSessionsSection(menu: NSMenu) {
+        // Find the existing header item (tag 100) and remove it + any inserted children up to the next separator.
+        guard let headerIdx = menu.items.firstIndex(where: { $0.tag == TagSessions }) else { return }
+        // Remove any session entries we inserted previously (they have TagSessionEntry).
+        let idx = headerIdx + 1
+        while idx < menu.items.count && menu.items[idx].tag == TagSessionEntry {
+            menu.removeItem(at: idx)
+        }
+
+        let active = Array(sessionStore.activeSessions.values).sorted(by: { $0.startedAt < $1.startedAt })
+        let header = menu.items[headerIdx]
+        if active.isEmpty {
+            header.title = "No active sessions"
+        } else {
+            header.title = active.count == 1 ? "1 active session" : "\(active.count) active sessions"
+            for (offset, session) in active.enumerated() {
+                let name = session.displayName.isEmpty ? session.projectName : session.displayName
+                let providerLabel = session.provider.displayName
+                let item = NSMenuItem(title: "  \(providerLabel) · \(name)", action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                item.tag = TagSessionEntry
+                menu.insertItem(item, at: headerIdx + 1 + offset)
+            }
+        }
+    }
+
+    private func refreshUpdateItem(menu: NSMenu) {
+        guard let item = menu.items.first(where: { $0.tag == TagUpdate }) else { return }
+        item.title = updateChecker.isChecking ? "Checking for Updates…" : "Check for Updates…"
+        item.isEnabled = !updateChecker.isChecking
+    }
+
+    // Stable tags so we can find items when rebuilding sub-sections.
+    private let TagSessions = 100
+    private let TagSessionEntry = 101
+    private let TagUpdate = 200
 
     @objc private func toggleSound() {
         settingsStore.soundEnabled.toggle()
@@ -102,7 +160,14 @@ final class MenuBarManager {
     }
 
     @objc private func installHooks() {
-        HookInstaller.install()
+        _ = HookInstaller.install()
+        _ = CodexInstaller.install()
+    }
+
+    @objc private func checkForUpdates() {
+        Task { @MainActor in
+            await updateChecker.checkForUpdates(showNoUpdateAlert: true)
+        }
     }
 
     @objc private func quit() {
