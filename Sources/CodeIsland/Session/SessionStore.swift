@@ -360,7 +360,14 @@ final class SessionStore: ObservableObject {
                             respond?(BridgeResponse.allow())
                         case .allowAll:
                             if isCodex {
-                                CodexPermissionRules.persistAlwaysAllow(toolName: toolName, toolInput: description)
+                                // For Codex, persist a prefix_rule for Bash only;
+                                // non-Bash tools can't be matched against
+                                // shell-command prefixes (issue #17). Either way,
+                                // ack the current call with a one-shot allow.
+                                let persisted = CodexPermissionRules.persistAlwaysAllow(toolName: toolName, toolInput: description)
+                                if !persisted {
+                                    Log.info("Codex Allow All not persisted for tool=\(toolName); allowing once")
+                                }
                                 respond?(BridgeResponse.allow())
                             } else if let data = BridgeResponse.allowAllForTool(toolName), respondRaw != nil {
                                 Log.info("Sending Claude allowAll raw data (\(data.count) bytes)")
@@ -370,7 +377,10 @@ final class SessionStore: ObservableObject {
                             }
                         case .bypass:
                             if isCodex {
-                                CodexPermissionRules.persistAlwaysAllow(toolName: toolName, toolInput: description, broad: true)
+                                let persisted = CodexPermissionRules.persistAlwaysAllow(toolName: toolName, toolInput: description, broad: true)
+                                if !persisted {
+                                    Log.info("Codex Bypass not persisted for tool=\(toolName); allowing once")
+                                }
                                 respond?(BridgeResponse.allow())
                             } else if let data = BridgeResponse.bypass(), respondRaw != nil {
                                 Log.info("Sending Claude bypass raw data (\(data.count) bytes)")

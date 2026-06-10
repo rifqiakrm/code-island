@@ -6,9 +6,7 @@ import Foundation
 /// to `~/.codex/rules/codeisland.rules`. Codex consults this file on every
 /// permission request and auto-approves matching tool calls.
 enum CodexPermissionRules {
-    /// Returns the directory `$CODEX_HOME` resolves to (honors the env var,
-    /// expands `~`, falls back to `~/.codex`). Mirrors the helper in
-    /// `CodexInstaller`.
+    /// Returns the directory `$CODEX_HOME` resolves to.
     private static var codexHome: URL {
         let raw = (ProcessInfo.processInfo.environment["CODEX_HOME"] ?? "")
             .trimmingCharacters(in: .whitespaces)
@@ -20,30 +18,48 @@ enum CodexPermissionRules {
     }
 
     /// Persist an "always allow" rule for a tool call. Returns true if the
-    /// rule was written (or already exists), false if there's nothing usable
-    /// to pattern on (e.g. a Bash event with no command string).
+    /// rule was written (or already exists), false if the rule isn't
+    /// representable as a Codex prefix_rule.
     ///
-    /// - For `Bash`: the first 3 tokens of the command become the prefix
-    ///   (`git commit -m "..."` → `["git", "commit", "-m"]`). This is the
-    ///   same heuristic the reference repo uses.
-    /// - For other tools: we fall back to matching on the tool name alone
-    ///   so that `Write` / `Read` / etc. can be allow-listed too.
-    /// - When `broad == true`, we widen the match to just the first token
-    ///   (Bash: `["git"]` matches all git commands; other tools: same as
-    ///   normal). We can't write a wildcard rule — Codex rejects empty
-    ///   patterns — so true "bypass everything" isn't possible. This is the
-    ///   closest practical equivalent: allow the whole tool family.
+    /// - Bash: first 3 tokens of the parsed command become the prefix.
+    /// - Non-Bash (Write/Read/Edit/…): NOT persistable. Codex matches
+    ///   prefix_rule against shell-command tokens, not tool names, so a
+    ///   rule like `pattern = ["Write"]` never matches anything. We return
+    ///   false and the caller falls back to a one-shot allow (issue #17).
+    /// - broad=true (Bypass): drop to the first token only.
+    /// - Patterns are validated as printable ASCII to keep the TOML file
+    ///   parseable (issue #19) and all quote chars are stripped from
+    ///   tokens (issue #18).
     @discardableResult
     static func persistAlwaysAllow(toolName: String, toolInput: String?, broad: Bool = false) -> Bool {
-        let rulesDir = codexHome.appendingPathComponent("rules")
-        let rulesFile = rulesDir.appendingPathComponent("codeisland.rules")
-        try? FileManager.default.createDirectory(at: rulesDir, withIntermediateDirectories: true)
+        // Non-Bash tools can't be persisted via prefix_rule — see #17.
+        guard toolName.lowercased() == "bash" else { return false }
+        guard let cmd = toolInput, !cmd.isEmpty else { return false }
 
-        var pattern = prefixPattern(toolName: toolName, toolInput: toolInput)
+        var pattern = shellPrefix(from: cmd, maxTokens: 3)
         if broad && !pattern.isEmpty {
             pattern = [pattern[0]]
         }
         guard !pattern.isEmpty else { return false }
+
+        // Validate every token is plain printable ASCII. Anything else
+        // (newlines from heredocs, tabs, control chars, non-ASCII) would
+        // either silently mis-quote in TOML or produce an invalid rules
+        // file that Codex refuses to load — losing every previously-good
+        // rule along with it (issue #19).
+        guard pattern.allSatisfy(isSafePatternToken) else {
+            Log.info("CodexPermissionRules: refusing to persist rule containing non-printable / non-ASCII tokens")
+            return false
+        }
+
+        let rulesDir = codexHome.appendingPathComponent("rules")
+        let rulesFile = rulesDir.appendingPathComponent("codeisland.rules")
+        do {
+            try FileManager.default.createDirectory(at: rulesDir, withIntermediateDirectories: true)
+        } catch {
+            Log.error("CodexPermissionRules: can't create \(rulesDir.path): \(error)")
+            return false
+        }
 
         let block = ruleBlock(for: pattern, broad: broad)
         let patternLine = patternLineFor(pattern: pattern)
@@ -59,30 +75,37 @@ enum CodexPermissionRules {
             try updated.write(to: rulesFile, atomically: true, encoding: .utf8)
             return true
         } catch {
+            Log.error("CodexPermissionRules: failed to write \(rulesFile.path): \(error)")
             return false
+        }
+    }
+
+    /// Plain printable ASCII (0x20–0x7E), excluding the chars TOML can't
+    /// quote unambiguously inside a basic string. Backslash is allowed —
+    /// we escape it in `quotedRuleString`.
+    private static func isSafePatternToken(_ token: String) -> Bool {
+        guard !token.isEmpty else { return false }
+        return token.unicodeScalars.allSatisfy { scalar in
+            scalar.value >= 0x20 && scalar.value <= 0x7E
         }
     }
 
     // MARK: - Pattern building
 
-    private static func prefixPattern(toolName: String, toolInput: String?) -> [String] {
-        if toolName.lowercased() == "bash", let cmd = toolInput {
-            return shellPrefix(from: cmd, maxTokens: 3)
-        }
-        // Fall back to the tool name so `Write`/`Read`/etc. can be allow-listed.
-        return [toolName]
-    }
-
-    /// Extract the first N whitespace-separated tokens from a shell command,
-    /// preserving quoted segments (so `git commit -m "fix bug"` → ["git","commit","-m"]).
+    /// Extract the first N whitespace-separated tokens from a shell command.
+    /// Quote characters act purely as delimiters and do NOT appear inside
+    /// the produced tokens — Codex compares against the parsed argv (which
+    /// has quotes stripped) so storing them here meant our rule never
+    /// matched (issue #18). `git commit -m "fix"` → `["git","commit","-m"]`.
+    /// We also unterminate-tolerantly close any open quote at EOF.
     private static func shellPrefix(from command: String, maxTokens: Int) -> [String] {
         var tokens: [String] = []
         var current = ""
         var inSingle = false
         var inDouble = false
         for ch in command {
-            if ch == "'" && !inDouble { inSingle.toggle(); current.append(ch); continue }
-            if ch == "\"" && !inSingle { inDouble.toggle(); current.append(ch); continue }
+            if ch == "'" && !inDouble { inSingle.toggle(); continue }
+            if ch == "\"" && !inSingle { inDouble.toggle(); continue }
             if ch.isWhitespace && !inSingle && !inDouble {
                 if !current.isEmpty { tokens.append(current); current = "" }
                 if tokens.count >= maxTokens { break }

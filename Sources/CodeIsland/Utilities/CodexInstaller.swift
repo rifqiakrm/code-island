@@ -1,11 +1,15 @@
 import Foundation
 
 /// Installs Code Island hooks into OpenAI Codex (`$CODEX_HOME/hooks.json`
-/// + `config.toml`). Mirrors the structure of `HookInstaller` but writes
-/// Codex's nested format and toggles the `[features].hooks = true` flag.
+/// + `config.toml`).
 ///
-/// Returns `false` only when the `config.toml` write fails — it succeeds
-/// even if Codex isn't installed yet so the hooks are pre-staged.
+/// Safety contract:
+/// - hooks.json: read existing, merge ONLY Code Island's own entries,
+///   preserve foreign hooks (issue #12). Backup to .bak before overwrite.
+/// - config.toml: detect `features.hooks` even when the user wrote it as a
+///   dotted key or inline table, and refuse to append a conflicting
+///   `[features]` block that would make Codex reject the whole file
+///   (issue #13).
 enum CodexInstaller {
     /// Path of `$CODEX_HOME`. Honors the env var, expands `~`, falls back to `~/.codex`.
     static var codexHome: URL {
@@ -21,8 +25,6 @@ enum CodexInstaller {
     }
 
     /// Returns true if the user appears to have Codex installed (i.e. its CONFIG dir exists).
-    /// We don't require Codex to be installed to write hooks, but the UI uses this
-    /// signal to decide whether to surface the install button.
     static var isDetected: Bool {
         FileManager.default.fileExists(atPath: codexHome.path)
     }
@@ -30,26 +32,28 @@ enum CodexInstaller {
     @discardableResult
     static func install() -> Bool {
         let dir = codexHome
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        } catch {
+            Log.error("CodexInstaller: can't create \(dir.path): \(error)")
+            return false
+        }
 
-        // 1. Write hooks.json in Codex's nested format
-        writeHooksJSON(in: dir)
-
-        // 2. Toggle `hooks = true` in config.toml (creates [features] if missing)
-        enableHooksFeature(in: dir)
-
-        // 3. Install bridge launcher that knows to pass `--source codex`
+        let hooksOK = writeHooksJSON(in: dir)
+        let tomlOK = enableHooksFeature(in: dir)
         installBridgeLauncher()
 
         print("[CodeIsland] Codex hooks installed at \(dir.path)")
-        return true
+        return hooksOK && tomlOK
     }
 
-    // MARK: - hooks.json
+    // MARK: - hooks.json (merge, don't overwrite)
 
-    /// Codex's hooks.json is a nested format with no `matcher` field, just an
-    /// event-name → array of entries containing `hooks` arrays.
-    private static func writeHooksJSON(in codexDir: URL) {
+    /// Merges Code Island's hooks into an existing hooks.json. Foreign
+    /// entries (user customizations, other tools) are left alone.
+    /// Returns false if read/write fails.
+    @discardableResult
+    private static func writeHooksJSON(in codexDir: URL) -> Bool {
         let bridgeCmd = bridgeCommand()
         let events = [
             "SessionStart", "SessionEnd", "UserPromptSubmit",
@@ -58,54 +62,148 @@ enum CodexInstaller {
         ]
         let permissionEvents = ["PermissionRequest"]
 
-        var hooksDict: [String: [[String: Any]]] = [:]
-        for ev in events {
-            hooksDict[ev] = [["hooks": [["type": "command", "command": bridgeCmd, "timeout": 5]]]]
-        }
-        for ev in permissionEvents {
-            hooksDict[ev] = [["hooks": [["type": "command", "command": bridgeCmd, "timeout": 300]]]]
+        let url = codexDir.appendingPathComponent("hooks.json")
+
+        // Load existing root, if any. Bail if present-but-malformed.
+        var root: [String: Any] = [:]
+        let existingData = try? Data(contentsOf: url)
+        if let data = existingData, !data.isEmpty {
+            guard let parsed = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                Log.error("CodexInstaller: \(url.path) exists but isn't valid JSON. Refusing to overwrite.")
+                return false
+            }
+            root = parsed
         }
 
-        let root: [String: Any] = ["hooks": hooksDict]
-        let url = codexDir.appendingPathComponent("hooks.json")
-        if let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) {
-            try? data.write(to: url, options: .atomic)
+        var hooks = root["hooks"] as? [String: Any] ?? [:]
+        for ev in events {
+            mergeCodeIslandEntry(in: &hooks, event: ev, command: bridgeCmd, timeout: 5)
+        }
+        for ev in permissionEvents {
+            mergeCodeIslandEntry(in: &hooks, event: ev, command: bridgeCmd, timeout: 300)
+        }
+        root["hooks"] = hooks
+
+        let newData: Data
+        do {
+            newData = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted])
+        } catch {
+            Log.error("CodexInstaller: failed to serialize hooks.json: \(error)")
+            return false
+        }
+
+        // Skip the write if nothing actually changed.
+        if let existing = existingData, normalizedJSON(existing) == normalizedJSON(newData) {
+            return true
+        }
+
+        if let existing = existingData, !existing.isEmpty {
+            try? existing.write(to: url.appendingPathExtension("bak"), options: .atomic)
+        }
+
+        do {
+            try newData.write(to: url, options: .atomic)
+            return true
+        } catch {
+            Log.error("CodexInstaller: failed to write \(url.path): \(error)")
+            return false
         }
     }
 
-    // MARK: - config.toml
+    /// Inserts or updates Code Island's entry for `event` while leaving any
+    /// foreign entries (user customizations, other tools) intact.
+    private static func mergeCodeIslandEntry(in hooks: inout [String: Any], event: String, command: String, timeout: Int) {
+        var entries = hooks[event] as? [[String: Any]] ?? []
 
-    /// Ensures `[features]` section exists in config.toml with `hooks = true`.
-    /// Replaces an existing `hooks = false` or appends to an existing `[features]` table,
-    /// otherwise appends a new section at the end of the file.
-    private static func enableHooksFeature(in codexDir: URL) {
+        let isOurs: ([String: Any]) -> Bool = { entry in
+            guard let inner = entry["hooks"] as? [[String: Any]] else { return false }
+            return inner.contains { ($0["command"] as? String)?.contains("code-island") == true }
+        }
+
+        let ourEntry: [String: Any] = [
+            "hooks": [["type": "command", "command": command, "timeout": timeout]]
+        ]
+
+        if let idx = entries.firstIndex(where: isOurs) {
+            entries[idx] = ourEntry
+        } else {
+            entries.append(ourEntry)
+        }
+        hooks[event] = entries
+    }
+
+    private static func normalizedJSON(_ data: Data) -> Data? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        return try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys])
+    }
+
+    // MARK: - config.toml (don't double-define [features])
+
+    /// Ensures `features.hooks = true` is set in config.toml without
+    /// creating a duplicate `features` table. Returns false only on a
+    /// detected conflict we refuse to resolve.
+    @discardableResult
+    private static func enableHooksFeature(in codexDir: URL) -> Bool {
         let url = codexDir.appendingPathComponent("config.toml")
         var lines: [String] = []
         if let existing = try? String(contentsOf: url, encoding: .utf8) {
             lines = existing.components(separatedBy: "\n")
         }
 
-        // Find the [features] section bounds
-        var featuresStart: Int? = nil
-        var featuresEnd: Int? = nil
+        // Detect every form of "features" the user could have written:
+        //   [features]                          (table header)
+        //   features.hooks = true               (dotted key)
+        //   features = { hooks = true }         (inline table)
+        //   ["features"]                        (quoted header)
+        var featuresHeader: Int? = nil
+        var hasDottedFeatures = false
+        var hasInlineFeatures = false
         for (i, line) in lines.enumerated() {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed == "[features]" {
-                featuresStart = i
-            } else if let start = featuresStart, i > start, trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
-                featuresEnd = i - 1
-                break
+            // Skip pure comments
+            if trimmed.hasPrefix("#") { continue }
+            if trimmed == "[features]" || trimmed == "[\"features\"]" {
+                featuresHeader = i
+            } else if trimmed.hasPrefix("features.") || trimmed.hasPrefix("\"features\".") {
+                hasDottedFeatures = true
+            } else if trimmed.hasPrefix("features ") || trimmed.hasPrefix("features=") {
+                // Likely inline table form: features = { ... }
+                hasInlineFeatures = true
             }
         }
 
-        if let start = featuresStart {
-            // Section exists — look for hooks key inside it
-            let end = featuresEnd ?? (lines.count - 1)
+        // If the user is using dotted or inline forms, surgical edit is
+        // risky (we don't have a real TOML parser). Either patch in place
+        // when possible, or bail with a clear log instead of corrupting
+        // the file by appending a conflicting [features] block.
+        if hasInlineFeatures {
+            Log.error("CodexInstaller: config.toml uses inline `features = { … }` form. Refusing to add a [features] section that would conflict. Set `features.hooks = true` manually or convert to a [features] table.")
+            return false
+        }
+        if hasDottedFeatures && featuresHeader == nil {
+            // Dotted keys are fine — just ensure features.hooks is true.
+            return upsertDottedHooks(lines: &lines, url: url)
+        }
+
+        if let start = featuresHeader {
+            // Find section end (next [section] header or EOF)
+            var end = lines.count - 1
+            for i in (start + 1)..<lines.count {
+                let t = lines[i].trimmingCharacters(in: .whitespaces)
+                if t.hasPrefix("[") && t.hasSuffix("]") {
+                    end = i - 1
+                    break
+                }
+            }
             var found = false
             for i in (start + 1)...end {
                 let trimmed = lines[i].trimmingCharacters(in: .whitespaces)
                 if trimmed.hasPrefix("hooks") {
-                    lines[i] = "hooks = true"
+                    if lines[i] != "hooks = true" {
+                        lines[i] = "hooks = true"
+                    } else {
+                        return true  // nothing to do
+                    }
                     found = true
                     break
                 }
@@ -114,7 +212,7 @@ enum CodexInstaller {
                 lines.insert("hooks = true", at: start + 1)
             }
         } else {
-            // No [features] section — append one
+            // No [features] anywhere — append a fresh section
             if !lines.isEmpty && !(lines.last?.isEmpty ?? true) {
                 lines.append("")
             }
@@ -123,14 +221,52 @@ enum CodexInstaller {
         }
 
         let output = lines.joined(separator: "\n")
-        try? output.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try output.write(to: url, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            Log.error("CodexInstaller: failed to write \(url.path): \(error)")
+            return false
+        }
+    }
+
+    /// Idempotently sets `features.hooks = true` for dotted-key configs.
+    private static func upsertDottedHooks(lines: inout [String], url: URL) -> Bool {
+        for (i, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("features.hooks") {
+                if lines[i] != "features.hooks = true" {
+                    lines[i] = "features.hooks = true"
+                } else {
+                    return true
+                }
+                let output = lines.joined(separator: "\n")
+                do {
+                    try output.write(to: url, atomically: true, encoding: .utf8)
+                    return true
+                } catch {
+                    Log.error("CodexInstaller: failed to write \(url.path): \(error)")
+                    return false
+                }
+            }
+        }
+        // No features.hooks line — append it
+        if !lines.isEmpty && !(lines.last?.isEmpty ?? true) {
+            lines.append("")
+        }
+        lines.append("features.hooks = true")
+        let output = lines.joined(separator: "\n")
+        do {
+            try output.write(to: url, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            Log.error("CodexInstaller: failed to write \(url.path): \(error)")
+            return false
+        }
     }
 
     // MARK: - Bridge launcher
 
-    /// Returns the command Codex's hooks.json should invoke. We use a launcher
-    /// script under `~/.code-island/bin/` so we can update the binary's
-    /// location without re-writing hook configs.
     private static func bridgeCommand() -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return "\(home.path)/.code-island/bin/code-island-codex-bridge"
@@ -142,8 +278,6 @@ enum CodexInstaller {
         try? FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
         let launcher = binDir.appendingPathComponent("code-island-codex-bridge")
 
-        // Same launcher script as the Claude bridge but passes `--source codex`
-        // before any extra args so the bridge stamps the right provider id.
         let script = [
             "#!/bin/zsh",
             "# code-island-codex-bridge launcher (auto-generated by Code Island)",
