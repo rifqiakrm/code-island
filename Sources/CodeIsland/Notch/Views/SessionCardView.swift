@@ -44,7 +44,9 @@ struct SessionCardView: View {
             }
 
             // Row 2: prompt (on its own line for readability)
-            if let prompt = session.firstPrompt ?? session.lastUserMessage {
+            // Show the latest user prompt — `firstPrompt` was sticky for
+            // the entire session and stayed stale after the user sent more.
+            if let prompt = session.lastUserMessage ?? session.firstPrompt {
                 Text(prompt)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(.white.opacity(0.7))

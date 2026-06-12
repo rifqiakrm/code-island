@@ -148,6 +148,24 @@ let assistantMessage: String? = {
     return nil
 }()
 
+/// Walk the Claude Code transcript backwards to find the most recent
+/// assistant line's `message.model`. Used as a fallback because Claude's
+/// hook payload (unlike Codex's) doesn't include the model directly.
+func lastModelFromTranscript(_ path: String) -> String? {
+    guard let data = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+    for line in data.components(separatedBy: "\n").reversed() {
+        guard !line.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+              json["type"] as? String == "assistant",
+              let message = json["message"] as? [String: Any],
+              let model = message["model"] as? String,
+              !model.isEmpty
+        else { continue }
+        return model
+    }
+    return nil
+}
+
 func lastAssistantFromTranscript(_ path: String) -> String? {
     guard let data = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
     let lines = data.components(separatedBy: "\n")
@@ -206,7 +224,15 @@ if let effort = payload["effort"] as? [String: Any], let level = effort["level"]
     message["effort_level"] = level
 }
 if let durationMs = payload["duration_ms"] as? Int { message["duration_ms"] = durationMs }
-if let model = payload["model"] as? String, !model.isEmpty { message["model"] = model }
+// Codex emits `model` at the top level. Claude doesn't — we have to
+// dig it out of the transcript file (each assistant line carries
+// `message.model`). Try top-level first, fall back to transcript.
+if let model = payload["model"] as? String, !model.isEmpty {
+    message["model"] = model
+} else if let transcriptPath = payload["transcript_path"] as? String,
+          let model = lastModelFromTranscript(transcriptPath) {
+    message["model"] = model
+}
 
 // Serialize
 guard let messageData = try? JSONSerialization.data(withJSONObject: message) else { exit(1) }
