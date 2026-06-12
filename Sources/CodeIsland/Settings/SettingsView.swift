@@ -33,6 +33,20 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .about:        return .blue
         }
     }
+
+    /// One-line description shown under the section title in the hero card.
+    var hero: String {
+        switch self {
+        case .general:
+            return "Launch behavior, notch expansion, and update preferences."
+        case .integrations:
+            return "Auto-install hooks for Claude Code and OpenAI Codex."
+        case .sound:
+            return "Per-event chimes, master volume, and custom sound packs."
+        case .about:
+            return "Version, links to source, license, and credits."
+        }
+    }
 }
 
 struct SettingsView: View {
@@ -42,50 +56,170 @@ struct SettingsView: View {
 
     @State private var selection: SettingsSection = .general
 
+    /// "v1.1.6" when bundled normally; "dev" when run from `swift run` /
+    /// `.build/debug/CodeIsland` (no Info.plist version baked in).
+    private var displayVersion: String {
+        let v = updateChecker.currentVersion
+        return v == "0.0.0" ? "dev" : v
+    }
+
     var body: some View {
         NavigationSplitView {
             sidebar
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 240)
         } detail: {
             detail
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        HStack(spacing: 8) {
-                            sidebarIcon(for: selection)
-                            Text(selection.title)
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                    }
-                }
         }
-        .frame(minWidth: 760, idealWidth: 820, minHeight: 560, idealHeight: 620)
+        .frame(minWidth: 760, idealWidth: 820, minHeight: 600, idealHeight: 660)
     }
 
     // MARK: - Sidebar
 
+    @State private var searchText: String = ""
+
     private var sidebar: some View {
-        List(selection: $selection) {
-            ForEach(SettingsSection.allCases) { section in
-                Label {
-                    Text(section.title)
-                        .font(.system(size: 13))
-                } icon: {
-                    sidebarIcon(for: section)
-                }
-                .tag(section)
-                .listRowInsets(EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0))
+        VStack(spacing: 0) {
+            // Search bar — Tahoe System Settings has this at the very top.
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                TextField("Search", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.primary.opacity(0.06))
+            )
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+
+            // Compact brand row (logo + name + subtitle).
+            HStack(spacing: 10) {
+                brandLogo
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Code Island")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("v\(displayVersion)")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+
+            // Section list — bigger icons, bigger fonts, full-width
+            // rounded blue highlight on the selected row.
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(filteredSections, id: \.self) { section in
+                        sectionRow(section)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 12)
+            }
+
+            Spacer(minLength: 0)
         }
-        .listStyle(.sidebar)
+        .background(.regularMaterial)
+    }
+
+    private var filteredSections: [SettingsSection] {
+        let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return SettingsSection.allCases }
+        return SettingsSection.allCases.filter {
+            $0.title.lowercased().contains(q) || $0.hero.lowercased().contains(q)
+        }
+    }
+
+    private func sectionRow(_ section: SettingsSection) -> some View {
+        let selected = selection == section
+        return Button { selection = section } label: {
+            HStack(spacing: 10) {
+                sidebarIcon(for: section)
+                Text(section.title)
+                    .font(.system(size: 14))
+                    .foregroundColor(selected ? .white : .primary)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(selected ? Color.accentColor : .clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Loads `logo.png` from any of the places it could plausibly live:
+    /// the .app's Resources/branding/, the .app's Resources/AppIcon.icns,
+    /// or — for `swift run` debug builds — the source tree's
+    /// `design/logo.png`. Returns nil if nothing matches; the brand row
+    /// falls back to a gradient placeholder.
+    private static func loadBrandLogo() -> NSImage? {
+        let fm = FileManager.default
+        // 1. Bundled via SPM resources or .app/Contents/Resources/branding/
+        if let url = Bundle.main.url(forResource: "logo", withExtension: "png", subdirectory: "branding"),
+           let img = NSImage(contentsOf: url) { return img }
+        if let url = Bundle.main.url(forResource: "logo", withExtension: "png"),
+           let img = NSImage(contentsOf: url) { return img }
+        // 2. .app's AppIcon.icns (always present in the packaged build)
+        if let url = Bundle.main.urlForImageResource("AppIcon"),
+           let img = NSImage(contentsOf: url) { return img }
+        // 3. Dev convenience: walk up from the executable to find design/logo.png
+        var dir = Bundle.main.bundleURL.deletingLastPathComponent()
+        for _ in 0..<6 {
+            let candidate = dir.appendingPathComponent("design/logo.png")
+            if fm.fileExists(atPath: candidate.path), let img = NSImage(contentsOf: candidate) {
+                return img
+            }
+            dir = dir.deletingLastPathComponent()
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private var brandLogo: some View {
+        if let nsImage = Self.loadBrandLogo() {
+            Image(nsImage: nsImage)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fill)
+        } else {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.42, green: 0.86, blue: 0.76),
+                                 Color(red: 0.27, green: 0.55, blue: 0.95)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    Image(systemName: "terminal.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                )
+        }
     }
 
     private func sidebarIcon(for section: SettingsSection) -> some View {
         Image(systemName: section.systemImage)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 14, weight: .semibold))
             .foregroundColor(.white)
-            .frame(width: 22, height: 22)
+            .frame(width: 26, height: 26)
             .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(section.accentColor.gradient)
             )
     }
@@ -95,6 +229,34 @@ struct SettingsView: View {
     @ViewBuilder
     private var detail: some View {
         Form {
+            // Hero card — Tahoe System Settings style. Big rounded-gradient
+            // icon, large title, one-line description. Sits in its own
+            // Section so the grouped form gives it the proper card chrome.
+            Section {
+                VStack(spacing: 14) {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(selection.accentColor.gradient)
+                        .frame(width: 64, height: 64)
+                        .overlay(
+                            Image(systemName: selection.systemImage)
+                                .font(.system(size: 30, weight: .semibold))
+                                .foregroundColor(.white)
+                        )
+                        .shadow(color: selection.accentColor.opacity(0.25), radius: 12, y: 6)
+                    VStack(spacing: 6) {
+                        Text(selection.title)
+                            .font(.system(size: 28, weight: .bold))
+                        Text(selection.hero)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+            }
+
             switch selection {
             case .general:      generalForm
             case .integrations: integrationsForm
@@ -264,34 +426,20 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var aboutForm: some View {
-        Section {
-            HStack(spacing: 14) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(LinearGradient(colors: [.cyan, .blue], startPoint: .top, endPoint: .bottom))
-                    .frame(width: 54, height: 54)
-                    .overlay(
-                        Image(systemName: "terminal.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                    )
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Code Island")
-                        .font(.system(size: 18, weight: .bold))
-                    Text("v1.1.5")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(.secondary)
-                    Text("The notch dashboard for your AI coding agents.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
+        Section("Version") {
+            HStack {
+                Text("Code Island")
                 Spacer()
+                Text("v\(displayVersion)")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(.secondary)
             }
-            .padding(.vertical, 4)
         }
 
         Section("Links") {
             LinkRow(label: "GitHub repository", url: URL(string: "https://github.com/rifqiakrm/code-island")!)
             LinkRow(label: "Report an issue",   url: URL(string: "https://github.com/rifqiakrm/code-island/issues")!)
+            LinkRow(label: "License",           url: URL(string: "https://github.com/rifqiakrm/code-island/blob/main/LICENSE")!)
         }
     }
 

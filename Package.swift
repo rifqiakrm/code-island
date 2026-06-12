@@ -17,6 +17,7 @@ let package = Package(
             resources: [
                 .copy("../../Resources/Sounds"),
                 .copy("../../Resources/cli-icons"),
+                .copy("../../Resources/branding"),
             ]
         ),
         .executableTarget(
