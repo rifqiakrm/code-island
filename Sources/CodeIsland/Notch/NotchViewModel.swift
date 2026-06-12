@@ -27,7 +27,7 @@ final class NotchViewModel: ObservableObject {
     static var collapsedSize: NSSize {
         guard ScreenDetector.hasNotch else { return NSSize(width: 280, height: 5) }
         let width = max(280, ScreenDetector.notchWidth + 100)
-        let height = ScreenDetector.notchHeight + 4
+        let height = ScreenDetector.notchHeight
         return NSSize(width: width, height: height)
     }
     // Expanded: compact, fits ~3 session cards

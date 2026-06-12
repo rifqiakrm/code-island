@@ -143,8 +143,18 @@ final class NotchWindowController: NSWindowController {
 
     private func repositionWindow() {
         guard let panel = window else { return }
-        animatePanelToSize(viewModel.currentSize, duration: 0.32)
-        _ = panel
+        let target = viewModel.currentSize
+        // Always snap the window to the (possibly new) notch screen's
+        // top-center first. Without this, a resolution change that
+        // doesn't alter our panel size leaves the window pinned at its
+        // old absolute coordinates — i.e. off-screen on the new
+        // resolution. Then run the size animation as usual.
+        let screen = ScreenDetector.notchScreen.frame
+        let cur = panel.frame.size
+        let x = screen.midX - cur.width / 2
+        let y = screen.maxY - cur.height
+        panel.setFrame(NSRect(x: x, y: y, width: cur.width, height: cur.height), display: true)
+        animatePanelToSize(target, duration: 0.32)
     }
 
     /// Display-link-driven frame animation. Stays in lock-step with the
