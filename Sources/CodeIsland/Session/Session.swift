@@ -97,6 +97,9 @@ struct Session: Identifiable {
     var effortLevel: String?
     var lastToolDurationMs: Int?
     var sessionTitle: String?
+    /// Model the agent is currently using, captured from any hook with a
+    /// `model` field. Shortened by `shortModelName` for display.
+    var model: String?
     /// AI provider identifier (claude / codex / gemini / ...).
     /// Defaults to "claude" if the bridge doesn't stamp a source.
     var source: String = "claude"
@@ -158,6 +161,17 @@ struct Session: Identifiable {
         let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.count <= max { return trimmed }
         return String(trimmed.prefix(max)) + "…"
+    }
+
+    /// Short, display-ready model label. Strips the provider prefix
+    /// (`claude-`) since the mascot already shows which provider it is,
+    /// and squashes Anthropic's dashes into spaces for readability.
+    var shortModelName: String? {
+        guard let raw = model, !raw.isEmpty else { return nil }
+        var s = raw
+        if s.hasPrefix("claude-") { s = String(s.dropFirst("claude-".count)) }
+        s = s.replacingOccurrences(of: "-", with: " ")
+        return s
     }
 
     var durationText: String {

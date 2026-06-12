@@ -206,6 +206,7 @@ if let effort = payload["effort"] as? [String: Any], let level = effort["level"]
     message["effort_level"] = level
 }
 if let durationMs = payload["duration_ms"] as? Int { message["duration_ms"] = durationMs }
+if let model = payload["model"] as? String, !model.isEmpty { message["model"] = model }
 
 // Serialize
 guard let messageData = try? JSONSerialization.data(withJSONObject: message) else { exit(1) }

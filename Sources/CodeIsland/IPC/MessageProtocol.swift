@@ -25,6 +25,10 @@ struct BridgeMessage: Codable {
     /// PID of the agent process that spawned the bridge (getppid in the bridge).
     /// Used to detect when an agent exits without firing SessionEnd.
     let agentPid: Int?
+    /// Model name the agent is using ("claude-sonnet-4-7", "gpt-5", etc.).
+    /// Captured straight from the hook payload's `model` field — both
+    /// Claude and Codex emit it.
+    let model: String?
 
     var terminalInfo: TerminalInfo? {
         guard let env else { return nil }
@@ -59,6 +63,7 @@ struct BridgeMessage: Codable {
         case sessionTitle = "session_title"
         case source
         case agentPid = "agent_pid"
+        case model
     }
 }
 

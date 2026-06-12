@@ -200,6 +200,10 @@ final class SessionStore: ObservableObject {
         if let effort = message.effortLevel {
             sessions[sessionId]?.effortLevel = effort
         }
+        // Stamp the model whenever the hook carries one.
+        if let m = message.model, !m.isEmpty {
+            sessions[sessionId]?.model = m
+        }
         // Always update session title if present
         if let title = message.sessionTitle, !title.isEmpty {
             sessions[sessionId]?.sessionTitle = title

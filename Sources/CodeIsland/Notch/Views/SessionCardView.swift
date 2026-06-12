@@ -30,6 +30,14 @@ struct SessionCardView: View {
                     EffortBadge(level: effort)
                 }
                 Spacer(minLength: 6)
+                if let model = session.shortModelName {
+                    Text(model)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.55))
+                    Text("·")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.25))
+                }
                 Text(session.durationText)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(.white.opacity(0.45))
