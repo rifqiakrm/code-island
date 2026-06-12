@@ -45,21 +45,9 @@ struct NotchBackground: View {
     let cornerRadius: CGFloat
 
     var body: some View {
-        ZStack {
-            // Pure black to match the notch
-            NotchShape(cornerRadius: cornerRadius)
-                .fill(.black)
-
-            // Subtle bottom/side border glow (not on top — that's the notch)
-            NotchShape(cornerRadius: cornerRadius)
-                .stroke(
-                    LinearGradient(
-                        colors: [.clear, .white.opacity(0.08), .white.opacity(0.12)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 0.5
-                )
-        }
+        // Pure black to match the notch — no stroke. The stroke read as
+        // an unwanted border on macOS Tahoe's compositor.
+        NotchShape(cornerRadius: cornerRadius)
+            .fill(.black)
     }
 }

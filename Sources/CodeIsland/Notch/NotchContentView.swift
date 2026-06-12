@@ -20,7 +20,6 @@ struct NotchContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(NotchShape(cornerRadius: viewModel.isExpanded ? 20 : 14))
-        .shadow(color: .black.opacity(0.4), radius: viewModel.isExpanded ? 16 : 6, y: 4)
         .onHover { hovering in
             if hovering {
                 viewModel.mouseEntered()

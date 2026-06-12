@@ -17,7 +17,7 @@ final class NotchPanel: NSPanel {
         // Transparency
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
 
         // Visible on all spaces, doesn't hide
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
