@@ -123,11 +123,15 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture notes, IPC payload shapes, 
 
 PRs welcome! Areas that could use work:
 
-- Code signing and notarization (so users don't need `xattr` workaround)
-- Gemini provider support
-- Session history view
+- Other AI provider support (Gemini CLI, Cursor, OpenCode, Droid, Qoder, Qwen, Kimi Code, DeepSeek, Copilot, CodeBuddy, Kiro, Hermes, Amp, and Pi Agent, etc)
+- Session history design/improvement
+- Hooks improvement
 - Multi-display notch support
+- Security improvement
+- More themes
 - More sound packs
+
+Other than that, if the issues/PRs are important we can consider to work on it or merge it too.
 
 ## License
 
