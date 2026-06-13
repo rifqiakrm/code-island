@@ -315,9 +315,6 @@ code { overflow-wrap: anywhere; }
     height 0.6s cubic-bezier(0.34, 1.2, 0.4, 1),
     border-radius 0.6s ease;
   text-align: left;
-  /* Scaled down to fit narrow viewports (set by JS); 1 = no scaling. */
-  transform: scale(var(--demo-scale, 1));
-  transform-origin: top center;
 }
 
 .notch-shape[data-state="idle"]     { width: 280px; border-radius: 0 0 18px 18px; }
