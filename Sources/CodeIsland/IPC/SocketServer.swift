@@ -177,7 +177,7 @@ final class SocketServer {
             close(fd)
         } : nil
 
-        Log.info("Socket: parsed message hookEvent=\(message.hookEvent) session=\(message.sessionId.prefix(8)) permissionMode=\(message.permissionMode ?? "nil") toolName=\(message.toolName ?? "nil") effort=\(message.effortLevel ?? "nil") durationMs=\(message.durationMs.map(String.init) ?? "nil") userMessage=\(message.userMessage?.prefix(40) ?? "nil")")
+        Log.info("Socket: parsed message source=\(message.source ?? "nil") hookEvent=\(message.hookEvent) session=\(message.sessionId.prefix(12)) permissionMode=\(message.permissionMode ?? "nil") toolName=\(message.toolName ?? "nil") effort=\(message.effortLevel ?? "nil") durationMs=\(message.durationMs.map(String.init) ?? "nil") userMessage=\(message.userMessage?.prefix(40) ?? "nil")")
 
         DispatchQueue.main.async { [weak self] in
             self?.onMessage?(message, respond, respondRaw)

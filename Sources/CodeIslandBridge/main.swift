@@ -13,12 +13,18 @@ let socketPath = "/tmp/code-island.sock"
 // Parse CLI args: optional `--source <id>` flag identifies which AI agent
 // the hook came from. Defaults to "claude" for backward compatibility.
 var providerSource = "claude"
+var eventTag: String? = nil
 do {
     var i = 1
     let args = CommandLine.arguments
     while i < args.count {
         if args[i] == "--source" && i + 1 < args.count {
             providerSource = args[i + 1]
+            i += 2
+        } else if args[i] == "--event" && i + 1 < args.count {
+            // Cursor/Copilot don't include the event name in stdin — they pass
+            // it here. Forwarded automatically by the launcher's "$@".
+            eventTag = args[i + 1]
             i += 2
         } else {
             i += 1
@@ -36,17 +42,98 @@ guard let payload = try? JSONSerialization.jsonObject(with: inputData) as? [Stri
     exit(1)
 }
 
-// Claude Code uses "hook_event_name" for the event type
-let hookEvent = payload["hook_event_name"] as? String
+// Determine the raw event name. Most CLIs put it in "hook_event_name";
+// Cursor/Copilot omit it and pass it via --event. Then normalize each
+// provider's event vocabulary to OUR canonical set so SessionStore — which
+// only understands the canonical names — works unchanged.
+let rawEvent = payload["hook_event_name"] as? String
     ?? payload["hook_event"] as? String
     ?? payload["type"] as? String
+    ?? eventTag
     ?? "Notification"
 
-let sessionId = payload["session_id"] as? String ?? UUID().uuidString
+// Per-source event-name normalization. Claude-Code forks (qwen/qoder/droid/
+// codebuddy) already speak canonical names → identity (not listed).
+let eventNormalization: [String: [String: String]] = [
+    "gemini": [
+        "BeforeTool": "PreToolUse", "AfterTool": "PostToolUse",
+        // Gemini has no Stop/UserPromptSubmit — drive status off the agent turn.
+        "BeforeAgent": "UserPromptSubmit", "AfterAgent": "Stop",
+    ],
+    "cursor": [
+        "beforeSubmitPrompt": "UserPromptSubmit",
+        "beforeShellExecution": "PreToolUse", "afterShellExecution": "PostToolUse",
+        "beforeReadFile": "PreToolUse", "afterFileEdit": "PostToolUse",
+        "beforeMCPExecution": "PreToolUse", "afterMCPExecution": "PostToolUse",
+        // Cursor fires BOTH afterAgentResponse (carries the reply text) and
+        // stop at the end of a turn. Map only afterAgentResponse → Stop so the
+        // Finished card gets the reply AND completion fires once, not twice;
+        // drop the redundant stop.
+        "afterAgentThought": "Notification", "afterAgentResponse": "Stop", "stop": "skip",
+    ],
+    "copilot": [
+        "sessionStart": "SessionStart", "sessionEnd": "SessionEnd",
+        "userPromptSubmitted": "UserPromptSubmit",
+        "preToolUse": "PreToolUse", "postToolUse": "PostToolUse",
+        "errorOccurred": "Notification",
+    ],
+    "qwen": ["PostToolUseFailure": "skip"],
+    "cline": [
+        // Cline's Task* lifecycle → our session/turn model. No SessionEnd
+        // (process sweep handles teardown); no PermissionRequest (Cline asks
+        // in the IDE). Cancel is treated as a turn end so the card settles.
+        "TaskStart": "SessionStart", "TaskResume": "UserPromptSubmit",
+        "TaskComplete": "Stop", "TaskCancel": "Stop",
+    ],
+    // kimi & opencode emit canonical names already → identity (not listed).
+]
+// Strict-approval gate. Gemini/Cursor/Copilot/Kimi don't have a selective
+// permission event — only blanket "before every tool" hooks. When the user
+// opts in (per provider, via ~/.code-island/config.json written by Settings),
+// we turn those `before*` events into BLOCKING permission prompts: the bridge
+// shows the notch UI and translates the decision back to the tool's own shape.
+let permissionGateEvents: [String: Set<String>] = [
+    "gemini": ["BeforeTool"],
+    "cursor": ["beforeShellExecution", "beforeMCPExecution"],
+    "copilot": ["preToolUse"],
+    "kimi": ["PreToolUse"],
+]
+func strictApprovalEnabled(_ source: String) -> Bool {
+    let url = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".code-island/config.json")
+    guard let data = try? Data(contentsOf: url),
+          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let map = root["strictApproval"] as? [String: Any] else { return false }
+    return (map[source] as? Bool) == true
+}
+let isStrictGate = (permissionGateEvents[providerSource]?.contains(rawEvent) ?? false)
+    && strictApprovalEnabled(providerSource)
+
+let hookEvent = isStrictGate
+    ? "PermissionRequest"
+    : (eventNormalization[providerSource]?[rawEvent] ?? rawEvent)
+// Events we don't track (e.g. Qwen's PostToolUseFailure) — drop silently.
+if hookEvent == "skip" { exit(0) }
+
+// Some CLIs use camelCase "sessionId" (Copilot) or omit it entirely. Fall
+// back to a STABLE per-process id — a random UUID would spawn a new session
+// card on every event.
+let sessionId = (payload["session_id"] as? String)
+    ?? (payload["sessionId"] as? String)
+    ?? "\(providerSource)-\(getppid())"
 let cwd = payload["cwd"] as? String
 
-// Extract tool name
-let toolName = payload["tool_name"] as? String
+// Extract tool name (Copilot uses camelCase "toolName"). For Cursor's strict
+// gate, shell/MCP events carry no tool_name — synthesize a readable label.
+func strictGateLabel(_ event: String) -> String? {
+    switch event {
+    case "beforeShellExecution": return "Shell"
+    case "beforeMCPExecution":   return "MCP"
+    default:                     return nil
+    }
+}
+let toolName = payload["tool_name"] as? String ?? payload["toolName"] as? String
+    ?? (isStrictGate ? strictGateLabel(rawEvent) : nil)
 
 // Extract tool input as a string summary, plus separate content/path for Write/Edit
 var toolInputStr: String? = nil
@@ -54,7 +141,15 @@ var toolContent: String? = nil
 var toolFilePath: String? = nil
 var toolOldString: String? = nil
 var toolNewString: String? = nil
-if let toolInput = payload["tool_input"] as? [String: Any] {
+// Copilot encodes tool args as a JSON-encoded STRING under "toolArgs".
+// Parse it so the extraction below sees a normal object.
+var normalizedToolInput = payload["tool_input"] as? [String: Any]
+if normalizedToolInput == nil, let argsStr = payload["toolArgs"] as? String,
+   let argsData = argsStr.data(using: .utf8),
+   let parsed = try? JSONSerialization.jsonObject(with: argsData) as? [String: Any] {
+    normalizedToolInput = parsed
+}
+if let toolInput = normalizedToolInput {
     if let cmd = toolInput["command"] as? String {
         toolInputStr = cmd
     } else if let fp = toolInput["file_path"] as? String {
@@ -85,6 +180,11 @@ if let toolInput = payload["tool_input"] as? [String: Any] {
     toolNewString = toolInput["new_string"] as? String
 } else if let toolInput = payload["tool_input"] as? String {
     toolInputStr = toolInput
+}
+// Cursor's beforeShellExecution carries the command at the TOP level (not in
+// tool_input) — surface it so the strict-approval card shows what's running.
+if toolInputStr == nil, let topCommand = payload["command"] as? String {
+    toolInputStr = topCommand
 }
 
 // Collect terminal env vars for jump support
@@ -136,14 +236,19 @@ func getParentPid(_ pid: pid_t) -> pid_t {
 // Extract user/assistant messages directly from Claude Code's payload
 let userMessage: String? = {
     if hookEvent == "UserPromptSubmit" {
+        // Claude uses "prompt"; Cursor/others vary.
         return payload["prompt"] as? String ?? payload["query"] as? String
+            ?? payload["user_prompt"] as? String ?? payload["message"] as? String
+            ?? payload["input"] as? String ?? payload["text"] as? String
     }
     return nil
 }()
 
 let assistantMessage: String? = {
     if hookEvent == "Stop" {
+        // Cursor's afterAgentResponse carries the reply in "text"/"message".
         return payload["last_assistant_message"] as? String
+            ?? payload["text"] as? String ?? payload["message"] as? String
     }
     return nil
 }()
@@ -338,10 +443,51 @@ if hookEvent == "PermissionRequest" {
         return (UInt32(p[0]) << 24) | (UInt32(p[1]) << 16) | (UInt32(p[2]) << 8) | UInt32(p[3])
     }
     if len > 0, len <= 4 * 1024 * 1024, let body = readExactly(fd: fd, count: Int(len)) {
-        FileHandle.standardOutput.write(body)
+        // For a strict-approval gate, the app replies in OUR (Claude) shape;
+        // translate it to the tool's native permission response before writing
+        // to stdout. Real PermissionRequest providers (Claude/Codex/Qwen/Qoder/
+        // OpenCode) already speak this shape, so pass their response through.
+        let out = isStrictGate ? translateStrictDecision(source: providerSource, appResponse: body) : body
+        FileHandle.standardOutput.write(out)
         try? FileHandle.standardOutput.synchronize()
     }
 }
 
 close(fd)
 exit(0)
+
+/// Maps the app's Claude-shaped decision → the gated tool's native response.
+/// Default to "allow" if anything is unparseable (matches each tool's fail-open
+/// behavior; better than silently denying the user's work).
+func translateStrictDecision(source: String, appResponse: Data) -> Data {
+    var behavior = "allow"
+    if let root = try? JSONSerialization.jsonObject(with: appResponse) as? [String: Any],
+       let hso = root["hookSpecificOutput"] as? [String: Any],
+       let decision = hso["decision"] as? [String: Any],
+       let b = decision["behavior"] as? String {
+        behavior = b   // "allow" | "deny" | "ask"
+    }
+    let deny = behavior == "deny"
+    let ask = behavior == "ask"
+    let reason = "Denied in Code Island"
+    let json: String
+    switch source {
+    case "gemini":
+        // Gemini has no "ask" — treat it as allow.
+        json = deny ? "{\"decision\":\"deny\",\"reason\":\"\(reason)\"}" : "{\"decision\":\"allow\"}"
+    case "cursor":
+        if deny { json = "{\"permission\":\"deny\",\"agent_message\":\"\(reason)\"}" }
+        else if ask { json = "{\"permission\":\"ask\"}" }
+        else { json = "{\"permission\":\"allow\"}" }
+    case "copilot":
+        if deny { json = "{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"\(reason)\"}" }
+        else if ask { json = "{\"permissionDecision\":\"ask\"}" }
+        else { json = "{\"permissionDecision\":\"allow\"}" }
+    case "kimi":
+        if deny { json = "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"\(reason)\"}}" }
+        else { json = "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}" }
+    default:
+        return appResponse
+    }
+    return Data(json.utf8)
+}

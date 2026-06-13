@@ -13,34 +13,62 @@ struct PixelMascot: View {
     private let animTimer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
 
     enum MascotShape {
-        case crab    // Claude — antennae + 4 walking legs + body + 2 eyes
-        case box     // Codex — chunky cube with head bump + 1 eye + 2 stubby feet
-        case sparkle // Gemini — diamond/sparkle silhouette (placeholder)
+        case crab        // Claude — antennae + 4 walking legs + body + 2 eyes
+        case box         // Codex — chunky cube with head bump + 1 eye + 2 stubby feet
+        case sparkle     // (legacy Gemini placeholder — kept for back-compat)
+        case geminiStar  // Gemini — blue→purple plus/star creature
+        case qwenGem     // Qwen — faceted violet gem head + chevron eyes
+        case qoderBlob   // Qoder — round green smiley blob
+        case factoryBot  // Factory/Droid — boxy orange industrial robot
+        case buddyCat    // CodeBuddy — purple cat astronaut
+        case cursorBox   // Cursor — dark monitor box w/ corner notch
+        case copilotBot  // Copilot — goggled rose robot
+        case kimiMoon    // Kimi — dark navy orb with a glowing crescent + eyes
+        case openCodeMark // OpenCode — dark terminal box w/ "-O-" face + feet
+        case clineBot    // Cline — rounded green bot, head knob, side ears, tall eyes
     }
 
     enum MascotPalette {
         // Idle / branded
-        case claude
-        case codex
-        case gemini
+        case claude, codex, gemini
+        case qwen, qoder, factory, codebuddy, cursor, copilot
+        case kimi, opencode, cline
         // Brand-tinted "active" palettes (thinking / using a tool)
-        case claudeActive
-        case codexActive
-        case geminiActive
+        case claudeActive, codexActive, geminiActive
+        case qwenActive, qoderActive, factoryActive, codebuddyActive, cursorActive, copilotActive
+        case kimiActive, opencodeActive, clineActive
         // Universal semantic palettes
         case error
         case waiting
 
         var body: Color {
             switch self {
-            case .claude:        return Color(red: 0.85, green: 0.47, blue: 0.34)
-            case .codex:         return Color(red: 0.92, green: 0.92, blue: 0.92)
-            case .gemini:        return Color(red: 0.55, green: 0.62, blue: 1.00)
-            case .claudeActive:  return Color(red: 0.30, green: 0.75, blue: 0.90)  // cyan
-            case .codexActive:   return Color(red: 0.60, green: 0.85, blue: 1.00)  // bright sky blue
-            case .geminiActive:  return Color(red: 0.72, green: 0.55, blue: 1.00)  // purple
-            case .error:         return Color(red: 0.90, green: 0.35, blue: 0.30)
-            case .waiting:       return Color(red: 1.00, green: 0.72, blue: 0.30)
+            case .claude:           return Color(red: 0.85, green: 0.47, blue: 0.34)
+            case .codex:            return Color(red: 0.92, green: 0.92, blue: 0.92)
+            case .gemini:           return Color(red: 0.278, green: 0.588, blue: 0.894)
+            case .qwen:             return Color(red: 0.486, green: 0.228, blue: 0.929)
+            case .qoder:            return Color(red: 0.165, green: 0.859, blue: 0.361)
+            case .factory:          return Color(red: 0.835, green: 0.416, blue: 0.149)
+            case .codebuddy:        return Color(red: 0.424, green: 0.302, blue: 1.000)
+            case .cursor:           return Color(red: 0.130, green: 0.120, blue: 0.090)
+            case .copilot:          return Color(red: 0.800, green: 0.200, blue: 0.400)
+            case .claudeActive:     return Color(red: 0.30, green: 0.75, blue: 0.90)  // cyan
+            case .codexActive:      return Color(red: 0.60, green: 0.85, blue: 1.00)  // bright sky blue
+            case .geminiActive:     return Color(red: 0.518, green: 0.478, blue: 0.808)
+            case .qwenActive:       return Color(red: 0.659, green: 0.510, blue: 0.984)
+            case .qoderActive:      return Color(red: 0.40, green: 1.00, blue: 0.58)
+            case .factoryActive:    return Color(red: 0.945, green: 0.565, blue: 0.235)
+            case .codebuddyActive:  return Color(red: 0.196, green: 0.902, blue: 0.725)
+            case .cursorActive:     return Color(red: 0.30, green: 0.28, blue: 0.24)
+            case .copilotActive:    return Color(red: 0.93, green: 0.38, blue: 0.56)
+            case .kimi:             return Color(red: 0.29, green: 0.56, blue: 1.00)  // Kimi blue #4A90FF
+            case .kimiActive:       return Color(red: 0.46, green: 0.72, blue: 1.00)  // brighter lunar glow
+            case .opencode:         return Color(red: 0.220, green: 0.220, blue: 0.240)  // #383838 dark gray
+            case .opencodeActive:   return Color(red: 0.345, green: 0.345, blue: 0.365)  // lighter when active
+            case .cline:            return Color(red: 0.00, green: 0.70, blue: 0.49)  // Cline green #00B37D
+            case .clineActive:      return Color(red: 0.20, green: 0.90, blue: 0.66)  // brighter green
+            case .error:            return Color(red: 0.90, green: 0.35, blue: 0.30)
+            case .waiting:          return Color(red: 1.00, green: 0.72, blue: 0.30)
             }
         }
 
@@ -50,9 +78,19 @@ struct PixelMascot: View {
     var body: some View {
         Canvas { context, canvasSize in
             switch shape {
-            case .crab:    drawCrab(context: context, canvasSize: canvasSize)
-            case .box:     drawBox(context: context, canvasSize: canvasSize)
-            case .sparkle: drawSparkle(context: context, canvasSize: canvasSize)
+            case .crab:        drawCrab(context: context, canvasSize: canvasSize)
+            case .box:         drawBox(context: context, canvasSize: canvasSize)
+            case .sparkle:     drawSparkle(context: context, canvasSize: canvasSize)
+            case .geminiStar:  drawShape(context, canvasSize, 44, drawGeminiStar)
+            case .qwenGem:     drawShape(context, canvasSize, 54, drawQwenGem)
+            case .qoderBlob:   drawShape(context, canvasSize, 52, drawQoderBlob)
+            case .factoryBot:  drawShape(context, canvasSize, 58, drawFactoryBot)
+            case .buddyCat:    drawShape(context, canvasSize, 60, drawBuddyCat)
+            case .cursorBox:   drawShape(context, canvasSize, 52, drawCursorBox)
+            case .copilotBot:  drawShape(context, canvasSize, 52, drawCopilotBot)
+            case .kimiMoon:    drawShape(context, canvasSize, 52, drawKimiMoon)
+            case .openCodeMark: drawShape(context, canvasSize, 50, drawOpenCodeMark)
+            case .clineBot:    drawShape(context, canvasSize, 48, drawClineBot)
             }
         }
         .frame(width: aspectAdjustedWidth, height: size)
@@ -63,10 +101,37 @@ struct PixelMascot: View {
 
     private var aspectAdjustedWidth: CGFloat {
         switch shape {
-        case .crab:    return size * (66.0 / 52.0)
-        case .box:     return size * (58.0 / 52.0)  // give it a bit of horizontal padding to match the crab
-        case .sparkle: return size
+        case .crab:        return size * (66.0 / 52.0)
+        case .box:         return size * (58.0 / 52.0)  // give it a bit of horizontal padding to match the crab
+        case .sparkle:     return size
+        case .geminiStar:  return size * (44.0 / 52.0)
+        case .qwenGem:     return size * (54.0 / 52.0)
+        case .qoderBlob:   return size
+        case .factoryBot:  return size * (58.0 / 52.0)
+        case .buddyCat:    return size * (60.0 / 52.0)
+        case .cursorBox:   return size
+        case .copilotBot:  return size
+        case .kimiMoon:    return size                  // 52/52
+        case .openCodeMark: return size * (50.0 / 52.0)
+        case .clineBot:    return size * (48.0 / 52.0)
         }
+    }
+
+    /// Shared helper for the provider mascots: sets up the 52-tall logical
+    /// transform + a `fill` closure and hands them to a per-shape draw block.
+    private func drawShape(_ context: GraphicsContext, _ canvasSize: CGSize, _ logicalWidth: CGFloat,
+                           _ draw: (GraphicsContext, (CGRect, Color) -> Void) -> Void) {
+        let scale = size / 52.0
+        let xOffset = (canvasSize.width - logicalWidth * scale) / 2
+        // Thinking bounce: gently bob the whole body up/down (gives the provider
+        // mascots the same "alive" feel as the crab's leg-walk / box's foot-bob,
+        // without a per-mascot leg rig).
+        let bob: CGFloat = animate ? [0, -1.5, -3, -1.5][animPhase % 4] : 0
+        let t = CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: bob)
+        func fill(_ rect: CGRect, _ color: Color) {
+            context.fill(Path(rect).applying(t), with: .color(color))
+        }
+        draw(context, fill)
     }
 
     // MARK: - Crab (Claude)
@@ -147,6 +212,261 @@ struct PixelMascot: View {
         fill(CGRect(x: 0, y: 22, width: 52, height: 8), palette.body)
         // Center diamond
         fill(CGRect(x: 18, y: 18, width: 16, height: 16), palette.body)
+    }
+
+    // MARK: - Provider mascots (ported from reference gifs / brand-designed)
+
+    private func drawGeminiStar(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let blue = palette.body
+        let purple = Color(red: 0.518, green: 0.478, blue: 0.808)
+        let foot = Color(red: 0.36, green: 0.33, blue: 0.55)
+        let eye = Color.white
+        fill(CGRect(x: 14, y: 0, width: 16, height: 14), blue)
+        fill(CGRect(x: 0,  y: 14, width: 22, height: 16), blue)
+        fill(CGRect(x: 22, y: 14, width: 22, height: 16), purple)
+        fill(CGRect(x: 13, y: 17, width: 7, height: 8), eye)
+        fill(CGRect(x: 24, y: 17, width: 7, height: 8), eye)
+        fill(CGRect(x: 12, y: 30, width: 20, height: 12), purple)
+        fill(CGRect(x: 13, y: 42, width: 7, height: 9), foot)
+        fill(CGRect(x: 24, y: 42, width: 7, height: 9), foot)
+    }
+
+    private func drawQwenGem(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let accentHi = Color(red: 0.659, green: 0.510, blue: 0.984)
+        let accentDk = Color(red: 0.427, green: 0.157, blue: 0.851)
+        let gemEye   = Color(red: 0.78, green: 0.92, blue: 1.0)
+        fill(CGRect(x: 19, y: 2,  width: 16, height: 5),  palette.body)
+        fill(CGRect(x: 12, y: 7,  width: 30, height: 5),  palette.body)
+        fill(CGRect(x: 6,  y: 12, width: 42, height: 7),  palette.body)
+        fill(CGRect(x: 3,  y: 19, width: 48, height: 8),  palette.body)
+        fill(CGRect(x: 6,  y: 27, width: 42, height: 6),  palette.body)
+        fill(CGRect(x: 12, y: 33, width: 30, height: 5),  palette.body)
+        fill(CGRect(x: 19, y: 38, width: 16, height: 4),  palette.body)
+        fill(CGRect(x: 22, y: 8,  width: 10, height: 4),  accentHi)
+        fill(CGRect(x: 16, y: 12, width: 22, height: 4),  accentHi)
+        fill(CGRect(x: 12, y: 16, width: 9,  height: 4),  accentHi)
+        fill(CGRect(x: 34, y: 22, width: 12, height: 9),  accentDk)
+        fill(CGRect(x: 30, y: 31, width: 10, height: 4),  accentDk)
+        fill(CGRect(x: 13, y: 19, width: 4, height: 4),  gemEye)
+        fill(CGRect(x: 17, y: 22, width: 4, height: 4),  gemEye)
+        fill(CGRect(x: 13, y: 25, width: 4, height: 4),  gemEye)
+        fill(CGRect(x: 30, y: 19, width: 4, height: 4),  gemEye)
+        fill(CGRect(x: 34, y: 22, width: 4, height: 4),  gemEye)
+        fill(CGRect(x: 30, y: 25, width: 4, height: 4),  gemEye)
+        fill(CGRect(x: 18, y: 42, width: 7, height: 9),  accentDk)
+        fill(CGRect(x: 29, y: 42, width: 7, height: 9),  accentDk)
+    }
+
+    private func drawQoderBlob(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        fill(CGRect(x: 18, y: 2,  width: 16, height: 4), palette.body)
+        fill(CGRect(x: 12, y: 6,  width: 28, height: 4), palette.body)
+        fill(CGRect(x: 8,  y: 10, width: 36, height: 4), palette.body)
+        fill(CGRect(x: 4,  y: 14, width: 44, height: 22), palette.body)
+        fill(CGRect(x: 8,  y: 36, width: 36, height: 4), palette.body)
+        fill(CGRect(x: 12, y: 40, width: 28, height: 3), palette.body)
+        fill(CGRect(x: 16, y: 18, width: 6, height: 7), palette.eyes)
+        fill(CGRect(x: 30, y: 18, width: 6, height: 7), palette.eyes)
+        fill(CGRect(x: 16, y: 28, width: 4, height: 3), palette.eyes)
+        fill(CGRect(x: 20, y: 30, width: 4, height: 3), palette.eyes)
+        fill(CGRect(x: 24, y: 31, width: 4, height: 3), palette.eyes)
+        fill(CGRect(x: 28, y: 30, width: 4, height: 3), palette.eyes)
+        fill(CGRect(x: 32, y: 28, width: 4, height: 3), palette.eyes)
+        fill(CGRect(x: 14, y: 43, width: 7, height: 7), palette.body)
+        fill(CGRect(x: 31, y: 43, width: 7, height: 7), palette.body)
+    }
+
+    private func drawFactoryBot(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let bodyDark = Color(red: 0.62, green: 0.30, blue: 0.11)
+        let metal    = Color(red: 0.40, green: 0.37, blue: 0.34)
+        let metalLt  = Color(red: 0.52, green: 0.49, blue: 0.46)
+        let gold     = Color(red: 0.89, green: 0.60, blue: 0.16)
+        fill(CGRect(x: 27, y: 0,  width: 4,  height: 6), metal)
+        fill(CGRect(x: 24, y: 0,  width: 10, height: 4), gold)
+        fill(CGRect(x: 0,  y: 22, width: 7,  height: 18), metal)
+        fill(CGRect(x: 51, y: 22, width: 7,  height: 18), metal)
+        fill(CGRect(x: 0,  y: 22, width: 7,  height: 3),  metalLt)
+        fill(CGRect(x: 51, y: 22, width: 7,  height: 3),  metalLt)
+        fill(CGRect(x: 7,  y: 6,  width: 44, height: 38), palette.body)
+        fill(CGRect(x: 12, y: 13, width: 34, height: 11), bodyDark)
+        fill(CGRect(x: 17, y: 16, width: 9,  height: 5),  gold)
+        fill(CGRect(x: 32, y: 16, width: 9,  height: 5),  gold)
+        fill(CGRect(x: 20, y: 17, width: 3,  height: 3),  palette.eyes)
+        fill(CGRect(x: 35, y: 17, width: 3,  height: 3),  palette.eyes)
+        fill(CGRect(x: 16, y: 27, width: 26, height: 13), bodyDark)
+        fill(CGRect(x: 18, y: 29, width: 3,  height: 3),  metal)
+        fill(CGRect(x: 37, y: 29, width: 3,  height: 3),  metal)
+        fill(CGRect(x: 18, y: 35, width: 3,  height: 3),  metal)
+        fill(CGRect(x: 37, y: 35, width: 3,  height: 3),  metal)
+        fill(CGRect(x: 14, y: 44, width: 12, height: 8),  metal)
+        fill(CGRect(x: 32, y: 44, width: 12, height: 8),  metal)
+        fill(CGRect(x: 14, y: 44, width: 12, height: 2),  metalLt)
+        fill(CGRect(x: 32, y: 44, width: 12, height: 2),  metalLt)
+    }
+
+    private func drawBuddyCat(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let cyan = Color(red: 0.196, green: 0.902, blue: 0.725)
+        let darkBand = Color(red: 0.165, green: 0.129, blue: 0.314)
+        let bodyDk = Color(red: 0.345, green: 0.243, blue: 0.827)
+        fill(CGRect(x: 6,  y: 0,  width: 11, height: 6),  palette.body)
+        fill(CGRect(x: 43, y: 0,  width: 11, height: 6),  palette.body)
+        fill(CGRect(x: 8,  y: 0,  width: 7,  height: 3),  cyan)
+        fill(CGRect(x: 45, y: 0,  width: 7,  height: 3),  cyan)
+        fill(CGRect(x: 4,  y: 6,  width: 52, height: 11), palette.body)
+        fill(CGRect(x: 8,  y: 17, width: 44, height: 11), darkBand)
+        fill(CGRect(x: 17, y: 20, width: 8,  height: 6),  cyan)
+        fill(CGRect(x: 35, y: 20, width: 8,  height: 6),  cyan)
+        fill(CGRect(x: 4,  y: 28, width: 52, height: 12), palette.body)
+        fill(CGRect(x: 56, y: 30, width: 4,  height: 8),  palette.body)
+        fill(CGRect(x: 14, y: 40, width: 11, height: 12), bodyDk)
+        fill(CGRect(x: 35, y: 40, width: 11, height: 12), bodyDk)
+    }
+
+    private func drawCursorBox(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let eyeC = palette.eyes
+        let pale = Color(red: 0.93, green: 0.93, blue: 0.93)
+        let notchC = Color(red: 0.42, green: 0.40, blue: 0.36)
+        fill(CGRect(x: 4, y: 6, width: 44, height: 34), palette.body)
+        fill(CGRect(x: 34, y: 0, width: 14, height: 9), notchC)
+        fill(CGRect(x: 34, y: 6, width: 14, height: 3), palette.body)
+        fill(CGRect(x: 11, y: 17, width: 9, height: 9), pale)
+        fill(CGRect(x: 14, y: 20, width: 3, height: 3), eyeC)
+        fill(CGRect(x: 26, y: 18, width: 14, height: 2), pale)
+        fill(CGRect(x: 26, y: 24, width: 11, height: 2), pale)
+        fill(CGRect(x: 26, y: 30, width: 13, height: 2), pale)
+        fill(CGRect(x: 12, y: 40, width: 8, height: 9), palette.body)
+        fill(CGRect(x: 32, y: 40, width: 8, height: 9), palette.body)
+    }
+
+    private func drawCopilotBot(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let gold = Color(red: 1.00, green: 0.84, blue: 0.00)
+        let visor = Color(red: 0.13, green: 0.13, blue: 0.16)
+        let ear = Color(red: 0.20, green: 0.20, blue: 0.20)
+        fill(CGRect(x: 24, y: 0, width: 4, height: 6), ear)
+        fill(CGRect(x: 21, y: 0, width: 10, height: 3), gold)
+        fill(CGRect(x: 4, y: 7, width: 12, height: 4), ear)
+        fill(CGRect(x: 4, y: 11, width: 4, height: 4), ear)
+        fill(CGRect(x: 12, y: 11, width: 4, height: 4), ear)
+        fill(CGRect(x: 36, y: 7, width: 12, height: 4), ear)
+        fill(CGRect(x: 36, y: 11, width: 4, height: 4), ear)
+        fill(CGRect(x: 44, y: 11, width: 4, height: 4), ear)
+        fill(CGRect(x: 10, y: 13, width: 32, height: 4), palette.body)
+        fill(CGRect(x: 6, y: 17, width: 40, height: 26), palette.body)
+        fill(CGRect(x: 10, y: 43, width: 32, height: 4), palette.body)
+        fill(CGRect(x: 11, y: 21, width: 30, height: 16), visor)
+        fill(CGRect(x: 14, y: 23, width: 11, height: 11), gold)
+        fill(CGRect(x: 16, y: 25, width: 7, height: 7), visor)
+        fill(CGRect(x: 18, y: 27, width: 4, height: 4), gold)
+        fill(CGRect(x: 27, y: 23, width: 11, height: 11), gold)
+        fill(CGRect(x: 29, y: 25, width: 7, height: 7), visor)
+        fill(CGRect(x: 31, y: 27, width: 4, height: 4), gold)
+        fill(CGRect(x: 25, y: 27, width: 2, height: 3), gold)
+        fill(CGRect(x: 20, y: 39, width: 12, height: 2), palette.body)
+        fill(CGRect(x: 14, y: 47, width: 8, height: 5), palette.body)
+        fill(CGRect(x: 30, y: 47, width: 8, height: 5), palette.body)
+    }
+
+    // MARK: - Kimi (lunar orb + glowing crescent)
+
+    private func drawKimiMoon(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let navy     = Color(red: 0.10, green: 0.13, blue: 0.26)   // deep lunar-night body
+        let navyEdge = Color(red: 0.16, green: 0.20, blue: 0.36)   // lighter rim highlight
+        let crescent = palette.body                                // brand blue / active glow
+        let glowHi   = Color(red: 0.78, green: 0.88, blue: 1.00)   // bright inner crescent edge
+        let eye      = palette.eyes                                // black
+        let spark    = Color(red: 0.95, green: 0.96, blue: 1.00)   // little star
+
+        // Round-ish orb body (stacked bars)
+        fill(CGRect(x: 19, y: 3,  width: 14, height: 4),  navy)
+        fill(CGRect(x: 13, y: 7,  width: 26, height: 4),  navy)
+        fill(CGRect(x: 8,  y: 11, width: 36, height: 5),  navy)
+        fill(CGRect(x: 5,  y: 16, width: 42, height: 20), navy)
+        fill(CGRect(x: 8,  y: 36, width: 36, height: 5),  navy)
+        fill(CGRect(x: 13, y: 41, width: 26, height: 4),  navy)
+        fill(CGRect(x: 19, y: 45, width: 14, height: 4),  navy)
+
+        // Rim highlight along the upper-left edge
+        fill(CGRect(x: 13, y: 7,  width: 26, height: 2),  navyEdge)
+        fill(CGRect(x: 8,  y: 11, width: 5,  height: 5),  navyEdge)
+        fill(CGRect(x: 5,  y: 16, width: 3,  height: 12), navyEdge)
+
+        // Glowing crescent (right side)
+        fill(CGRect(x: 34, y: 11, width: 5,  height: 5),  crescent)
+        fill(CGRect(x: 38, y: 15, width: 6,  height: 6),  crescent)
+        fill(CGRect(x: 40, y: 21, width: 6,  height: 10), crescent)
+        fill(CGRect(x: 38, y: 31, width: 6,  height: 6),  crescent)
+        fill(CGRect(x: 34, y: 36, width: 5,  height: 5),  crescent)
+        fill(CGRect(x: 33, y: 16, width: 3,  height: 4),  glowHi)
+        fill(CGRect(x: 35, y: 22, width: 3,  height: 8),  glowHi)
+        fill(CGRect(x: 33, y: 32, width: 3,  height: 4),  glowHi)
+
+        // Face: two eyes + glints
+        fill(CGRect(x: 17, y: 22, width: 5,  height: 7),  eye)
+        fill(CGRect(x: 26, y: 22, width: 5,  height: 7),  eye)
+        fill(CGRect(x: 18, y: 23, width: 2,  height: 2),  glowHi)
+        fill(CGRect(x: 27, y: 23, width: 2,  height: 2),  glowHi)
+
+        // Little twinkle star, upper-right
+        fill(CGRect(x: 44, y: 5,  width: 2,  height: 6),  spark)
+        fill(CGRect(x: 42, y: 7,  width: 6,  height: 2),  spark)
+    }
+
+    // MARK: - OpenCode (terminal monitor box, "-O-" face)
+
+    private func drawOpenCodeMark(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let frame = Color(red: 0.55, green: 0.55, blue: 0.57)  // light-gray bezel
+        let face  = Color(red: 0.85, green: 0.85, blue: 0.87)  // light face wells
+        let foot  = Color(red: 0.35, green: 0.35, blue: 0.37)  // darker legs
+
+        // Light frame/bezel (body insets to leave a 2px edge)
+        fill(CGRect(x: 1,  y: 4,  width: 48, height: 34), frame)
+        // Dark monitor body
+        fill(CGRect(x: 3,  y: 6,  width: 44, height: 30), palette.body)
+        // Top bezel highlight strip
+        fill(CGRect(x: 3,  y: 6,  width: 44, height: 3),  frame)
+
+        // "-O-" terminal face
+        fill(CGRect(x: 12, y: 16, width: 5,  height: 11), face)  // left bar eye
+        fill(CGRect(x: 22, y: 18, width: 6,  height: 6),  face)  // center "O"
+        fill(CGRect(x: 33, y: 16, width: 5,  height: 11), face)  // right bar eye
+        fill(CGRect(x: 13, y: 19, width: 3,  height: 5),  palette.eyes)
+        fill(CGRect(x: 34, y: 19, width: 3,  height: 5),  palette.eyes)
+
+        // Two stubby feet
+        fill(CGRect(x: 11, y: 38, width: 8,  height: 8),  foot)
+        fill(CGRect(x: 31, y: 38, width: 8,  height: 8),  foot)
+    }
+
+    // MARK: - Cline (rounded green bot)
+
+    private func drawClineBot(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
+        let body  = palette.body
+        let dark  = Color(red: 0.00, green: 0.42, blue: 0.30) // shaded green underbelly
+        let light = Color(red: 0.30, green: 0.92, blue: 0.70) // top highlight knob
+        let eye   = Color.white
+
+        // Head knob (centered)
+        fill(CGRect(x: 20, y: 0,  width: 8,  height: 6),  light)
+        fill(CGRect(x: 18, y: 4,  width: 12, height: 4),  body)
+
+        // Side "ears" flanking the body
+        fill(CGRect(x: 0,  y: 20, width: 6,  height: 16), body)
+        fill(CGRect(x: 42, y: 20, width: 6,  height: 16), body)
+
+        // Rounded body silhouette (stacked bars)
+        fill(CGRect(x: 10, y: 8,  width: 28, height: 4),  body) // shoulders
+        fill(CGRect(x: 6,  y: 12, width: 36, height: 28), body) // main mass
+        fill(CGRect(x: 10, y: 40, width: 28, height: 4),  body) // chin
+
+        // Shaded underbelly band
+        fill(CGRect(x: 8,  y: 36, width: 32, height: 5),  dark)
+
+        // Two tall white eyes
+        fill(CGRect(x: 16, y: 18, width: 6,  height: 14), eye)
+        fill(CGRect(x: 26, y: 18, width: 6,  height: 14), eye)
+
+        // Two short legs/feet
+        fill(CGRect(x: 14, y: 44, width: 8,  height: 7),  dark)
+        fill(CGRect(x: 26, y: 44, width: 8,  height: 7),  dark)
     }
 }
 

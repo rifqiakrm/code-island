@@ -13,13 +13,15 @@ final class MenuBarManager: NSObject, NSMenuDelegate {
     private let updateChecker: UpdateChecker
     private let onQuit: () -> Void
     private let onReloadSounds: () -> Void
+    private let onShowWhatsNew: () -> Void
     private var settingsWindow: NSWindow?
 
-    init(settingsStore: SettingsStore, sessionStore: SessionStore, updateChecker: UpdateChecker, onReloadSounds: @escaping () -> Void, onQuit: @escaping () -> Void) {
+    init(settingsStore: SettingsStore, sessionStore: SessionStore, updateChecker: UpdateChecker, onReloadSounds: @escaping () -> Void, onShowWhatsNew: @escaping () -> Void, onQuit: @escaping () -> Void) {
         self.settingsStore = settingsStore
         self.sessionStore = sessionStore
         self.updateChecker = updateChecker
         self.onReloadSounds = onReloadSounds
+        self.onShowWhatsNew = onShowWhatsNew
         self.onQuit = onQuit
         super.init()
         setupStatusItem()
@@ -66,6 +68,14 @@ final class MenuBarManager: NSObject, NSMenuDelegate {
         let installItem = NSMenuItem(title: "Install Hooks", action: #selector(installHooks), keyEquivalent: "")
         installItem.target = self
         menu.addItem(installItem)
+
+        let whatsNewItem = NSMenuItem(title: "What's New", action: #selector(showWhatsNew), keyEquivalent: "")
+        whatsNewItem.target = self
+        menu.addItem(whatsNewItem)
+
+        let supportItem = NSMenuItem(title: "Support the project ♥", action: #selector(openSupport), keyEquivalent: "")
+        supportItem.target = self
+        menu.addItem(supportItem)
 
         let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         updateItem.target = self
@@ -167,6 +177,16 @@ final class MenuBarManager: NSObject, NSMenuDelegate {
     @objc private func checkForUpdates() {
         Task { @MainActor in
             await updateChecker.checkForUpdates(showNoUpdateAlert: true)
+        }
+    }
+
+    @objc private func showWhatsNew() {
+        onShowWhatsNew()
+    }
+
+    @objc private func openSupport() {
+        if let url = URL(string: "https://ko-fi.com/rifqiakrm") {
+            NSWorkspace.shared.open(url)
         }
     }
 

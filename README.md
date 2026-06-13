@@ -6,7 +6,7 @@
 
 <p><b>Turn your MacBook's notch into a live dashboard for your AI coding agents.</b></p>
 
-<p>Approve permissions, answer questions, track rate limits, and jump between<br/>terminals — all from the notch. Works with <b>Claude Code</b> and <b>OpenAI Codex</b> out of the box.</p>
+<p>Approve permissions, answer questions, track rate limits, and jump between<br/>terminals — all from the notch. Works with <b>12 AI coding agents</b> — Claude Code, Codex, Gemini, Cursor, Copilot, and more — out of the box.</p>
 
 <p>
 <img src="https://img.shields.io/badge/macOS-14%2B-1d1d1f?logo=apple&logoColor=white" alt="macOS 14+" />
@@ -18,7 +18,7 @@
 
 ## Features
 
-- **Multi-provider** — Claude Code and Codex (CLI + GUI) side by side in one notch
+- **12 AI coding agents** — Claude Code, Codex, Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot, Kimi, OpenCode, and Cline, side by side in one notch
 - **Live session tracking** — every running agent visible at a glance, grouped by provider
 - **Permission UI** — approve, deny, allow-all, or bypass from the notch without switching apps
 - **Question UI** — Claude's `AskUserQuestion` and Codex's `request_user_input` surfaced inline; click to answer (Claude) or jump to the app (Codex)
@@ -28,13 +28,36 @@
 - **Terminal jump** — click a session card to jump back to the terminal/IDE running it
 - **Dynamic terminal detection** — iTerm2, Ghostty, Terminal.app, VS Code, JetBrains, Codex.app, and more
 - **8-bit sound effects** — per-event toggles with optional custom sound packs
-- **Pixel-art mascots** — Claude (crab) and Codex (terminal box) animate by status
+- **Pixel-art mascots** — every agent gets its own hand-drawn pixel mascot that animates by status
 - **Notch themes** — 5 looks (Default, Liquid Glass, Retro Pixel, Terminal, Neo-Brutalist), switch live in Settings → Appearance
+
+## Supported Tools
+
+Code Island auto-installs hooks for every agent it detects on launch — install one and it just shows up in the notch. Hooks are written idempotently and never clobber existing config: foreign hooks are preserved and the original is backed up to `.bak`.
+
+| Mascot | Tool | Events | Jump-to | Permission / question UI |
+|:------:|------|:------:|:-------:|:------------------------:|
+| <img src="docs/mascots/claude.png" width="28"/> | <img src="Resources/cli-icons/claude.png" width="15"/> **Claude Code** | full | ✅ | ✅ |
+| <img src="docs/mascots/codex.png" width="28"/> | <img src="Resources/cli-icons/codex.png" width="15"/> **Codex** (CLI + app) | full | ✅ | ✅ |
+| <img src="docs/mascots/gemini.png" width="28"/> | <img src="Resources/cli-icons/gemini.png" width="15"/> **Gemini CLI** | 6 | ✅ | — |
+| <img src="docs/mascots/qwen.png" width="28"/> | <img src="Resources/cli-icons/qwen.png" width="15"/> **Qwen Code** | full | ✅ | ✅ |
+| <img src="docs/mascots/qoder.png" width="28"/> | <img src="Resources/cli-icons/qoder.png" width="15"/> **Qoder** | 11 | ✅ | ✅ |
+| <img src="docs/mascots/droid.png" width="28"/> | <img src="Resources/cli-icons/droid.png" width="15"/> **Factory** (`droid`) | 10 | ✅ | — |
+| <img src="docs/mascots/codebuddy.png" width="28"/> | <img src="Resources/cli-icons/codebuddy.png" width="15"/> **CodeBuddy** | 10 | ✅ | — |
+| <img src="docs/mascots/cursor.png" width="28"/> | <img src="Resources/cli-icons/cursor.png" width="15"/> **Cursor** | 10 | ✅ | — |
+| <img src="docs/mascots/copilot.png" width="28"/> | <img src="Resources/cli-icons/copilot.png" width="15"/> **Copilot** | 6 | ✅ | — |
+| <img src="docs/mascots/kimi.png" width="28"/> | <img src="Resources/cli-icons/kimi.png" width="15"/> **Kimi Code CLI** | 10 | ✅ | — |
+| <img src="docs/mascots/opencode.png" width="28"/> | <img src="Resources/cli-icons/opencode.png" width="15"/> **OpenCode** | all | ✅ | ✅ |
+| <img src="docs/mascots/cline.png" width="28"/> | <img src="Resources/cli-icons/cline.png" width="15"/> **Cline** | 8 | ✅ | — |
+
+**Jump-to works for every agent** — there's no per-tool jump config. The bridge tags each session with the host app it detected by walking the process tree, and clicking a card brings you straight there. **iTerm2, Terminal.app, Ghostty, JetBrains IDEs, VS Code, Cursor, and Windsurf** get tab/window-level precision; any other terminal or app is brought to the front.
+
+**Permission / question UI** ✅ marks the agents with a *selective* permission hook that surfaces approve/deny (and questions) directly in the notch — Claude, Codex, Qwen, Qoder, and OpenCode. Gemini, Cursor, Copilot, and Kimi expose only blanket "before every tool" hooks (no native selective permission), so Code Island tracks their sessions/tools/completions and you approve in the tool; Factory, CodeBuddy, and Cline have no externally-answerable permission hook.
 
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- At least one of: Claude Code, Codex CLI, or Codex.app
+- At least one supported AI coding agent (see [Supported Tools](#supported-tools))
 
 ## Installation
 
@@ -45,13 +68,13 @@
    xattr -cr /Applications/Code\ Island.app
    ```
 4. Launch Code Island — hooks for every detected provider install automatically
-5. Start a session in Claude Code or Codex and watch the notch come alive
+5. Start a session in any supported agent and watch the notch come alive
 
 ## How It Works
 
 1. The agent fires hooks (`SessionStart`, `Stop`, `PreToolUse`, `PermissionRequest`, etc.)
-2. Hook calls `~/.code-island/bin/code-island-bridge` (Claude) or `code-island-codex-bridge` (Codex) with JSON on stdin
-3. Bridge enriches the payload (terminal detection via process tree walk, `--source` flag tagging) and forwards it to the app via Unix socket at `/tmp/code-island.sock`
+2. Hook calls the matching launcher in `~/.code-island/bin/` (e.g. `code-island-bridge` for Claude, `code-island-cursor-bridge` for Cursor) with JSON on stdin
+3. Bridge normalizes each tool's event vocabulary to a canonical set, enriches the payload (terminal detection via process tree walk, `--source` tagging), and forwards it to the app via Unix socket at `/tmp/code-island.sock`
 4. For `PermissionRequest`: the socket connection stays open, the app sends a response back, and the bridge writes it to stdout for the agent
 5. For Codex's `request_user_input` (multi-choice questions): the question is mirrored in the notch; clicking activates Codex.app so you can answer there
 
@@ -73,19 +96,20 @@ Themes only restyle the *chrome*. Your mascots, status colors, and rate-limit wa
 Code Island.app/
 ├── Contents/
 │   ├── MacOS/Code Island                ← Main SwiftUI app (menu bar + notch panel)
-│   ├── Helpers/CodeIslandBridge         ← CLI bridge (Claude + Codex hooks, --source flag)
+│   ├── Helpers/CodeIslandBridge         ← CLI bridge: normalizes every provider's hooks (--source flag)
 │   └── Info.plist                       ← LSUIElement=true (no dock icon)
 └── ~/.code-island/
-    ├── bin/code-island-bridge           ← Claude launcher (zsh shim)
-    ├── bin/code-island-codex-bridge     ← Codex launcher (passes --source codex)
+    ├── bin/code-island-<agent>-bridge   ← one zsh launcher per agent (claude, codex, gemini, cursor, …)
+    ├── config.json                      ← strict-approval flags (read by the bridge)
     ├── cache/rl.json                    ← Cached rate limits
     ├── debug.log                        ← Runtime log
     └── sound-packs/                     ← Custom sound files
 ```
 
-Hooks live at:
+Hooks live in each agent's own config — Code Island writes them idempotently, preserving any existing hooks and backing up the original to `.bak`. A few examples:
 - `~/.claude/settings.json` (Claude Code)
 - `~/.codex/hooks.json` + `[features].hooks = true` in `~/.codex/config.toml` (Codex)
+- `~/.gemini/settings.json`, `~/.cursor/hooks.json`, `~/.config/opencode/` (plugin), `~/.kimi/config.toml`, `~/Documents/Cline/Hooks/`, …
 
 **Tech stack:** Swift 5.9+, SwiftUI + AppKit, macOS 14.0+, Swift Package Manager, POSIX sockets, `AVAudioEngine` for 8-bit sound synthesis.
 
@@ -121,17 +145,37 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture notes, IPC payload shapes, 
 
 ## Contributing
 
-PRs welcome! Areas that could use work:
+PRs welcome! Code Island already ships 12 agents (see [Supported Tools](#supported-tools)) — here's where help is most useful:
 
-- Other AI provider support (Gemini CLI, Cursor, OpenCode, Droid, Qoder, Qwen, Kimi Code, DeepSeek, Copilot, CodeBuddy, Kiro, Hermes, Amp, and Pi Agent, etc)
-- Session history design/improvement
-- Hooks improvement
+**Add another provider.** Agents not wired up yet include Trae / TraeCli, Kiro, DeepSeek, Amp, Pi, StepFun, AntiGravity, WorkBuddy, and Hermes. Adding one is mostly data + a mascot:
+
+1. An `AIProvider` entry (id, accent color, mascot) in `Sources/CodeIsland/Session/AIProvider.swift`
+2. A `PixelMascot` shape + idle/active palette in `Sources/CodeIsland/Notch/Views/PixelMascot.swift`
+3. A `ProviderInstaller.Descriptor` (config path, format, timeout unit, events) in `Sources/CodeIsland/Utilities/ProviderInstaller.swift` — or a new `Format` case if the tool's config is exotic (TOML, JS plugin, bash scripts all have precedents)
+4. Event-name normalization in `Sources/CodeIslandBridge/main.swift` if the tool's hook vocabulary differs from the canonical set
+5. A CLI icon at `Resources/cli-icons/<id>.png`
+
+See [CLAUDE.md](CLAUDE.md) for the full provider-abstraction notes.
+
+**Other ideas**
+
+- In-notch permission ("review every action") support for more of the blanket-hook tools
+- Session history view
 - Multi-display notch support
-- Security improvement
-- More themes
-- More sound packs
+- Security hardening
+- More themes and sound packs
 
-Other than that, if the issues/PRs are important we can consider to work on it or merge it too.
+If an issue or PR is valuable, we're happy to pick it up or merge it.
+
+## Support the project
+
+Code Island is free and built in my spare time. If it's saved you a few context-switches and you'd like to chip in, it's hugely appreciated (and totally optional) — thank you! ☕
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/rifqiakrm)
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/rifqiakrm)
+
+- **Ko-fi** — https://ko-fi.com/rifqiakrm
+- **PayPal** — https://paypal.me/rifqiakrm
 
 ## License
 

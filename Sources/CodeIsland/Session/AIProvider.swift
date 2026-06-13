@@ -38,16 +38,120 @@ struct AIProvider: Identifiable, Hashable {
     static let gemini = AIProvider(
         id: "gemini",
         displayName: "Gemini",
-        accentColor: Color(red: 0.55, green: 0.62, blue: 1.00),
+        accentColor: Color(red: 0.278, green: 0.588, blue: 0.894),
         mascotPalette: .gemini,
         activeMascotPalette: .geminiActive,
-        mascotShape: .sparkle
+        mascotShape: .geminiStar
     )
 
-    static let all: [AIProvider] = [.claude, .codex, .gemini]
+    static let qwen = AIProvider(
+        id: "qwen",
+        displayName: "Qwen Code",
+        accentColor: Color(red: 0.486, green: 0.228, blue: 0.929),
+        mascotPalette: .qwen,
+        activeMascotPalette: .qwenActive,
+        mascotShape: .qwenGem
+    )
+
+    static let qoder = AIProvider(
+        id: "qoder",
+        displayName: "Qoder",
+        accentColor: Color(red: 0.165, green: 0.859, blue: 0.361),
+        mascotPalette: .qoder,
+        activeMascotPalette: .qoderActive,
+        mascotShape: .qoderBlob
+    )
+
+    /// Factory's CLI is `droid` — the bridge stamps `--source droid`, so the
+    /// id matches that while the label stays "Factory".
+    static let factory = AIProvider(
+        id: "droid",
+        displayName: "Factory",
+        accentColor: Color(red: 0.835, green: 0.416, blue: 0.149),
+        mascotPalette: .factory,
+        activeMascotPalette: .factoryActive,
+        mascotShape: .factoryBot
+    )
+
+    static let codebuddy = AIProvider(
+        id: "codebuddy",
+        displayName: "CodeBuddy",
+        accentColor: Color(red: 0.424, green: 0.302, blue: 1.000),
+        mascotPalette: .codebuddy,
+        activeMascotPalette: .codebuddyActive,
+        mascotShape: .buddyCat
+    )
+
+    static let cursor = AIProvider(
+        id: "cursor",
+        displayName: "Cursor",
+        // Cursor's brand is near-black; use a readable warm-gray for the
+        // chip/border tint so it isn't invisible on the dark notch.
+        accentColor: Color(red: 0.60, green: 0.58, blue: 0.54),
+        mascotPalette: .cursor,
+        activeMascotPalette: .cursorActive,
+        mascotShape: .cursorBox
+    )
+
+    static let copilot = AIProvider(
+        id: "copilot",
+        displayName: "Copilot",
+        accentColor: Color(red: 0.800, green: 0.200, blue: 0.400),
+        mascotPalette: .copilot,
+        activeMascotPalette: .copilotActive,
+        mascotShape: .copilotBot
+    )
+
+    static let kimi = AIProvider(
+        id: "kimi",
+        displayName: "Kimi",
+        accentColor: Color(red: 0.29, green: 0.56, blue: 1.000),  // Kimi blue #4A90FF
+        mascotPalette: .kimi,
+        activeMascotPalette: .kimiActive,
+        mascotShape: .kimiMoon
+    )
+
+    static let opencode = AIProvider(
+        id: "opencode",
+        displayName: "OpenCode",
+        // OpenCode is monochrome; readable light gray so the chip/border isn't
+        // invisible on the dark notch (same approach as Cursor's near-black).
+        accentColor: Color(red: 0.62, green: 0.62, blue: 0.64),
+        mascotPalette: .opencode,
+        activeMascotPalette: .opencodeActive,
+        mascotShape: .openCodeMark
+    )
+
+    static let cline = AIProvider(
+        id: "cline",
+        displayName: "Cline",
+        accentColor: Color(red: 0.00, green: 0.70, blue: 0.49),  // Cline green #00B37D
+        mascotPalette: .cline,
+        activeMascotPalette: .clineActive,
+        mascotShape: .clineBot
+    )
+
+    static let all: [AIProvider] = [
+        .claude, .codex, .gemini, .qwen, .qoder, .factory, .codebuddy, .cursor, .copilot,
+        .kimi, .opencode, .cline,
+    ]
 
     static func from(_ source: String?) -> AIProvider {
         guard let source else { return .claude }
         return all.first(where: { $0.id == source }) ?? .claude
+    }
+
+    /// Which buttons the permission window should show — capped to what each
+    /// tool's hook actually supports (showing buttons that silently no-op is
+    /// worse than not showing them). Claude/Codex persist allow-all & bypass;
+    /// Claude-fork + OpenCode support allow-all; Cursor/Copilot only allow an
+    /// allow/deny/defer; Gemini/Kimi only allow/deny.
+    var permissionActions: [PermissionAction] {
+        switch id {
+        case "claude", "codex":          return [.deny, .allowOnce, .allowAll, .bypass]
+        case "qwen", "qoder", "opencode": return [.deny, .allowOnce, .allowAll]
+        case "cursor", "copilot":        return [.deny, .allowOnce, .deferToApp]
+        default:                         return [.deny, .allowOnce]   // gemini, kimi
+        }
     }
 }

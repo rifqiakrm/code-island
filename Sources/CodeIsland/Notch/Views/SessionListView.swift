@@ -92,16 +92,19 @@ struct SessionListView: View {
             .padding(.top, 10)
             .padding(.bottom, 6)
 
-            // Filter chips — only show when there are >=2 providers active
+            // Filter chips — only show when there are >=2 providers active.
+            // Horizontally scrollable so many providers (we support a dozen+)
+            // keep their natural width instead of compressing into slivers.
             if presentProviders.count >= 2 {
-                HStack(spacing: 5) {
-                    filterChip(provider: nil, label: "ALL", count: sessionStore.activeSessions.count, color: .white)
-                    ForEach(presentProviders) { p in
-                        filterChip(provider: p, label: p.displayName.uppercased(), count: sessions(for: p).count, color: p.accentColor)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        filterChip(provider: nil, label: "ALL", count: sessionStore.activeSessions.count, color: .white)
+                        ForEach(presentProviders) { p in
+                            filterChip(provider: p, label: p.displayName.uppercased(), count: sessions(for: p).count, color: p.accentColor)
+                        }
                     }
-                    Spacer()
+                    .padding(.horizontal, 14)
                 }
-                .padding(.horizontal, 14)
                 .padding(.top, 8)
                 .padding(.bottom, 6)
             }
@@ -174,14 +177,14 @@ struct SessionListView: View {
         Button(action: { selectedProvider = provider }) {
             HStack(spacing: 5) {
                 if let p = provider {
-                    Circle()
-                        .fill(p.accentColor)
-                        .frame(width: 6, height: 6)
+                    ProviderIcon(provider: p, size: 13)
                 }
                 Text(label)
                     .font(theme.font(size: 10, weight: .heavy))
                     .foregroundColor(isSelected ? color : color.opacity(0.55))
                     .kerning(0.8)
+                    .lineLimit(1)
+                    .fixedSize()
                 Text("\(count)")
                     .font(theme.font(size: 9, weight: .bold))
                     .foregroundColor(isSelected ? color.opacity(0.85) : color.opacity(0.4))

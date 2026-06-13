@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notchWindowController: NotchWindowController?
     private var menuBarManager: MenuBarManager?
     private var onboardingController: OnboardingWindowController?
+    private var whatsNewController: WhatsNewWindowController?
     private let sessionStore = SessionStore()
     private let socketServer = SocketServer()
     private let soundEngine = SoundEngine()
@@ -100,6 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sessionStore: sessionStore,
             updateChecker: updateChecker,
             onReloadSounds: { [weak self] in self?.soundEngine.reloadSounds() },
+            onShowWhatsNew: { [weak self] in self?.showWhatsNew() },
             onQuit: { NSApp.terminate(nil) }
         )
 
@@ -116,6 +118,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task.detached {
             _ = HookInstaller.install()
             _ = CodexInstaller.install()
+            // Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot — each
+            // installed only if its config dir is present (Factory bootstraps).
+            _ = ProviderInstaller.installAll()
         }
 
         // Subscribe SessionStore to Codex app-server thread stream. This both
@@ -142,6 +147,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // its own flag so it shows exactly once, never again on later updates.
         if !settingsStore.hasSeenThemeOnboarding {
             showOnboarding()
+            // Fresh-install onboarding already covers everything — don't also
+            // pop What's New; stamp the current version so it's considered seen.
+            settingsStore.lastWhatsNewVersion = updateChecker.currentVersion
+        } else if settingsStore.lastWhatsNewVersion != updateChecker.currentVersion {
+            // Returning user who just updated → show the What's New highlights.
+            showWhatsNew()
         }
 
         // Auto update check — silent unless a newer release is found. Checks
@@ -190,6 +201,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         onboardingController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func showWhatsNew() {
+        whatsNewController = WhatsNewWindowController(
+            version: updateChecker.currentVersion,
+            onClose: { [weak self] in
+                guard let self else { return }
+                self.settingsStore.lastWhatsNewVersion = self.updateChecker.currentVersion
+                self.whatsNewController = nil
+            }
+        )
+        whatsNewController?.showWindow(nil)
     }
 
     private func cleanupPidFile() {

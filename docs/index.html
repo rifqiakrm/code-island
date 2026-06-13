@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Code Island — Claude Code + Codex, live in your notch</title>
-  <meta name="description" content="Native macOS app that turns your MacBook's notch into a live dashboard for Claude Code and OpenAI Codex. Approve permissions, answer questions, track rate limits — all from the notch." />
+  <title>Code Island — 12 AI coding agents, live in your notch</title>
+  <meta name="description" content="Native macOS app that turns your MacBook's notch into a live dashboard for 12 AI coding agents — Claude Code, Codex, Gemini, Cursor, Copilot, and more. Approve permissions, answer questions, track rate limits — all from the notch." />
   <link rel="icon" type="image/png" href="assets/logo.png" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <meta property="og:title" content="Code Island — Claude Code + Codex, live in your notch" />
-  <meta property="og:description" content="The notch dashboard for your AI coding agents. Multi-provider, fully local, free for personal use." />
+  <meta property="og:title" content="Code Island — 12 AI coding agents, live in your notch" />
+  <meta property="og:description" content="The notch dashboard for your AI coding agents — 12 supported. Multi-provider, fully local, free for personal use." />
   <meta property="og:image" content="assets/logo.png" />
   <meta name="twitter:card" content="summary_large_image" />
 </head>
@@ -27,6 +27,7 @@
       <a href="#how">How it works</a>
       <a href="#providers">Providers</a>
       <a href="#faq">FAQ</a>
+      <a href="#support">Support</a>
       <a class="ghost" href="https://github.com/rifqiakrm/code-island" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
   </nav>
@@ -34,11 +35,11 @@
   <!-- HERO -->
   <header class="hero" id="top">
     <div class="hero-inner">
-      <span class="eyebrow">v1.2.1 · macOS 14+ · Open source</span>
+      <span class="eyebrow">v1.3.0 · macOS 14+ · Open source</span>
       <h1>Your AI coding agents,<br/><span class="accent">live in the notch.</span></h1>
       <p class="subtitle">
         Monitor sessions, approve permissions, answer questions, and jump back to your terminal —<br/>
-        without ever leaving the notch. <strong>Claude Code</strong> and <strong>OpenAI Codex</strong> in one place.
+        without ever leaving the notch. <strong>12 AI coding agents</strong> in one place.
       </p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/rifqiakrm/code-island/releases/latest" target="_blank" rel="noopener">
@@ -47,9 +48,18 @@
         <a class="btn ghost" href="#how">See how it works</a>
       </div>
       <div class="providers-row">
-        <div class="provider"><img src="assets/claude.png" alt="" width="20" height="20" /><span>Claude Code</span></div>
-        <div class="provider"><img src="assets/codex.png" alt="" width="20" height="20" /><span>Codex CLI + GUI</span></div>
-        <div class="provider"><span class="soon">Gemini · soon</span></div>
+        <img src="mascots/claude.png" alt="Claude Code" title="Claude Code" width="34" height="34" />
+        <img src="mascots/codex.png" alt="Codex" title="Codex" width="34" height="34" />
+        <img src="mascots/gemini.png" alt="Gemini" title="Gemini CLI" width="34" height="34" />
+        <img src="mascots/qwen.png" alt="Qwen" title="Qwen Code" width="34" height="34" />
+        <img src="mascots/qoder.png" alt="Qoder" title="Qoder" width="34" height="34" />
+        <img src="mascots/droid.png" alt="Factory" title="Factory" width="34" height="34" />
+        <img src="mascots/codebuddy.png" alt="CodeBuddy" title="CodeBuddy" width="34" height="34" />
+        <img src="mascots/cursor.png" alt="Cursor" title="Cursor" width="34" height="34" />
+        <img src="mascots/copilot.png" alt="Copilot" title="Copilot" width="34" height="34" />
+        <img src="mascots/kimi.png" alt="Kimi" title="Kimi Code CLI" width="34" height="34" />
+        <img src="mascots/opencode.png" alt="OpenCode" title="OpenCode" width="34" height="34" />
+        <img src="mascots/cline.png" alt="Cline" title="Cline" width="34" height="34" />
       </div>
     </div>
 
@@ -332,13 +342,13 @@
       <div class="grid reveal reveal-stagger">
         <article class="feature">
           <div class="ico">◉</div>
-          <h3>Multi-provider</h3>
-          <p>Claude Code and Codex side by side. Filter chips, collapsible per-provider groups, jump between them instantly.</p>
+          <h3>12 agents, side by side</h3>
+          <p>Claude, Codex, Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot, Kimi, OpenCode &amp; Cline. Filter chips, collapsible per-provider groups, jump between them instantly.</p>
         </article>
         <article class="feature">
           <div class="ico">✓</div>
           <h3>Permission UI</h3>
-          <p>Deny, Allow Once, Allow All, or Bypass — without leaving your editor. Codex gets persistent <code>prefix_rule</code>s; Claude gets session rules.</p>
+          <p>Approve or deny without leaving your editor — buttons adapt per agent. Claude &amp; Codex get Allow All + Bypass (session rules / <code>prefix_rule</code>s); others show only what their hooks support, or hand off to the tool.</p>
         </article>
         <article class="feature">
           <div class="ico">?</div>
@@ -368,7 +378,7 @@
         <article class="feature">
           <div class="ico">▣</div>
           <h3>Pixel mascots</h3>
-          <p>Claude crab (terracotta → cyan) and Codex terminal box (gray → sky-blue) animate by status. Bounce when thinking.</p>
+          <p>Every agent gets its own hand-drawn pixel mascot — crab, gem, moon, robot, cat &amp; more — that bounces while thinking and swaps color by status.</p>
         </article>
         <article class="feature">
           <div class="ico">⏻</div>
@@ -443,8 +453,8 @@
   <section class="providers-section" id="providers">
     <div class="container">
       <span class="section-eyebrow reveal">PROVIDERS</span>
-      <h2 class="reveal">Pick your agent. Or both.</h2>
-      <p class="lead reveal">Code Island treats every provider as a first-class citizen with its own mascot, palette, and quirks.</p>
+      <h2 class="reveal">Pick your agent. Or all twelve.</h2>
+      <p class="lead reveal">Code Island treats every provider as a first-class citizen — its own mascot, palette, and quirks. Claude and Codex go deepest; here's the full lineup.</p>
 
       <div class="provider-cards reveal reveal-stagger">
         <div class="prov-card">
@@ -483,6 +493,50 @@
             <li><span class="check">✓</span> 5h / 7d rate limits (ChatGPT auth)</li>
             <li><span class="check">✓</span> Pixel terminal-box mascot</li>
           </ul>
+        </div>
+      </div>
+
+      <p class="lead reveal" style="margin-top:52px;">…and ten more — each with its own animated mascot, accent, and hooks:</p>
+      <div class="reveal" style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:18px;">
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/gemini.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Gemini CLI</div><div style="font-size:12px;color:var(--muted);">Google · terminal</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/qwen.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Qwen Code</div><div style="font-size:12px;color:var(--muted);">Alibaba · permission UI</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/qoder.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Qoder</div><div style="font-size:12px;color:var(--muted);">Claude fork · permission UI</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/droid.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Factory</div><div style="font-size:12px;color:var(--muted);">the <code>droid</code> CLI</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/codebuddy.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">CodeBuddy</div><div style="font-size:12px;color:var(--muted);">Tencent · CLI</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/cursor.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Cursor</div><div style="font-size:12px;color:var(--muted);">the AI editor</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/copilot.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Copilot</div><div style="font-size:12px;color:var(--muted);">GitHub Copilot CLI</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/kimi.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Kimi Code CLI</div><div style="font-size:12px;color:var(--muted);">Moonshot AI</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/opencode.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">OpenCode</div><div style="font-size:12px;color:var(--muted);">open source · permission UI</div></div>
+        </div>
+        <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
+          <img src="mascots/cline.png" width="38" height="38" alt="" />
+          <div><div style="font-weight:600;">Cline</div><div style="font-size:12px;color:var(--muted);">VS Code extension</div></div>
         </div>
       </div>
     </div>
@@ -642,6 +696,19 @@ swift build -c release
     })();
   </script>
 
+  <!-- SUPPORT -->
+  <section class="support" id="support" style="padding: 84px 0; text-align: center;">
+    <div class="container">
+      <span class="section-eyebrow">SUPPORT</span>
+      <h2>Free forever. Fueled by ☕</h2>
+      <p class="lead">Code Island is free and open source, built in spare time. If it's earned a spot in your notch and you'd like to support development, it genuinely means a lot — and it's completely optional.</p>
+      <div class="cta" style="justify-content: center;">
+        <a class="btn primary" href="https://ko-fi.com/rifqiakrm" target="_blank" rel="noopener">Support on Ko-fi ☕</a>
+        <a class="btn ghost" href="https://paypal.me/rifqiakrm" target="_blank" rel="noopener">Donate via PayPal</a>
+      </div>
+    </div>
+  </section>
+
   <!-- FOOTER -->
   <footer class="footer">
     <div class="container footer-grid">
@@ -665,9 +732,14 @@ swift build -c release
         <a href="https://github.com/rifqiakrm/code-island/blob/main/LICENSE">License</a>
       </div>
       <div>
+        <h4>Support</h4>
+        <a href="https://ko-fi.com/rifqiakrm" target="_blank" rel="noopener">Ko-fi ☕</a>
+        <a href="https://paypal.me/rifqiakrm" target="_blank" rel="noopener">PayPal</a>
+      </div>
+      <div>
         <h4>Credits</h4>
         <a href="https://vibeisland.app" target="_blank" rel="noopener">Inspired by Vibe Island</a>
-        <a href="https://claude-code-mascot-generator.replit.app/" target="_blank" rel="noopener">Claude mascot generator</a>
+        <a href="https://github.com/farouqaldori/vibe-notch" target="_blank" rel="noopener">Crab mascot · Vibe Notch</a>
       </div>
     </div>
     <p class="copy">© 2026 Code Island · Personal, non-commercial use only.</p>

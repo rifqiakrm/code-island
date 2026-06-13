@@ -1,6 +1,6 @@
 # Code Island
 
-A native macOS Swift app that turns your MacBook's notch into a live dashboard for your AI coding agents (Claude Code + OpenAI Codex). Inspired by [Vibe Island](https://vibeisland.app). See [README.md](README.md) for user-facing docs.
+A native macOS Swift app that turns your MacBook's notch into a live dashboard for **12 AI coding agents** — Claude Code, Codex, Gemini, Qwen, Qoder, Factory (`droid`), CodeBuddy, Cursor, Copilot, Kimi, OpenCode, and Cline. Inspired by [Vibe Island](https://vibeisland.app). See [README.md](README.md) for user-facing docs.
 
 ## Architecture
 
@@ -8,11 +8,11 @@ A native macOS Swift app that turns your MacBook's notch into a live dashboard f
 Code Island.app/
 ├── Contents/
 │   ├── MacOS/code-island                ← Main SwiftUI app (menu bar, notch panel)
-│   ├── Helpers/CodeIslandBridge         ← CLI bridge (reads hook JSON via stdin; --source flag)
+│   ├── Helpers/CodeIslandBridge         ← CLI bridge: reads hook JSON via stdin; --source / --event flags
 │   └── Info.plist                       ← LSUIElement=true (no dock icon)
 └── ~/.code-island/
-    ├── bin/code-island-bridge           ← Claude launcher (zsh shim)
-    ├── bin/code-island-codex-bridge     ← Codex launcher (passes --source codex)
+    ├── bin/code-island-<agent>-bridge   ← one zsh launcher per agent (claude has no suffix; codex/gemini/cursor/…)
+    ├── config.json                      ← {"strictApproval": {provider: bool}} — read by the bridge
     ├── run/code-island.pid
     ├── cache/rl.json                    ← Cached rate limits per provider
     ├── debug.log                        ← Runtime debug log
@@ -23,21 +23,27 @@ Code Island.app/
 
 ## Provider Abstraction
 
-`AIProvider` (Sources/CodeIsland/Session/AIProvider.swift) unifies Claude and Codex with:
+`AIProvider` (Sources/CodeIsland/Session/AIProvider.swift) unifies all 12 agents with:
 - `id`, `displayName`, `accentColor`
-- `mascotShape` (.crab / .box / .sparkle)
+- `mascotShape` (per-agent Canvas pixel art — `.crab`, `.box`, `.geminiStar`, `.qwenGem`, `.qoderBlob`, `.factoryBot`, `.buddyCat`, `.cursorBox`, `.copilotBot`, `.kimiMoon`, `.openCodeMark`, `.clineBot`)
 - `mascotPalette` / `activeMascotPalette`
 - `AIProvider.from(source:)` maps the bridge's `source` field to a provider
+- `AIProvider.all` is the source of truth — adding a provider here flows it everywhere (filter chips, grouping, mascot, accent)
 
-Each `Session.source` defaults to "claude" if the bridge doesn't stamp it.
+Note: Factory's CLI is `droid`, so its provider `id` is `"droid"` while `displayName` is "Factory".
+Each `Session.source` defaults to "claude" if the bridge doesn't stamp it. **The CLI icon (`ProviderIcon`) loads `Resources/cli-icons/<id>.png`** (so Factory's icon is `droid.png`); README/onboarding mascots are rendered from the same `PixelMascot` code to `docs/mascots/<id>.png`.
+
+**Adding a provider** (see README "Contributing" for the checklist): `AIProvider` entry + `PixelMascot` shape/palette + a `ProviderInstaller.Descriptor` (or new `Format`) + bridge event-normalization (if its vocabulary differs) + `Resources/cli-icons/<id>.png`.
 
 ## IPC Flow
 
 1. Agent fires hooks (SessionStart, Stop, PreToolUse, PostToolUse, PermissionRequest, etc.)
-2. Hook calls the appropriate launcher in `~/.code-island/bin/` with JSON on stdin
-3. Bridge stamps `source` (claude / codex), captures parent PID via `getppid()`, enriches with terminal env vars (process tree walk for bundle ID)
+2. Hook calls the appropriate launcher in `~/.code-island/bin/` with JSON on stdin (some agents also pass `--event <name>` because their stdin omits the event)
+3. Bridge stamps `source`, captures parent PID via `getppid()`, enriches with terminal env vars (process tree walk for bundle ID), and **normalizes each agent's event vocabulary to our canonical set** (e.g. Gemini `BeforeTool`→`PreToolUse`, Cursor `afterAgentResponse`→`Stop`)
 4. Bridge sends JSON to Code Island app via Unix socket at `/tmp/code-island.sock`
-5. For PermissionRequest: socket connection stays open, app sends response back, bridge outputs to stdout
+5. For PermissionRequest: socket connection stays open, app sends response back, bridge outputs to stdout (translating to the agent's native response shape when it's a strict-approval gate — see below)
+
+**Canonical event guard**: `SessionStore.handleMessage` drops any message whose `hookEvent` isn't in the canonical set (`SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `Stop`, `Notification`, `SubagentStart`, `SubagentStop`, `PreCompact`). Every bridge normalizes to these before sending, so a raw camelCase name arriving means a foreign/misconfigured integration sharing the socket — ignore it (this fixed Cursor sessions getting mis-attributed to Claude by a phantom sender).
 
 ## Key Hook Payload Fields
 
@@ -47,7 +53,7 @@ Each `Session.source` defaults to "claude" if the bridge doesn't stamp it.
 - `permission_mode` — "bypassPermissions" means auto-allow (Claude only, set at session startup)
 - `transcript_path` — path to session .jsonl file
 - `tool_name` — for `AskUserQuestion` (Claude) or `request_user_input` (Codex), show question UI
-- `source` — provider identifier ("claude" / "codex"), stamped by the bridge
+- `source` — provider identifier ("claude", "codex", "gemini", "cursor", "droid", …), stamped by the bridge from `--source`
 
 ## Permission Modes (Claude, mid-session setMode)
 
@@ -134,7 +140,7 @@ Live-fetched over HTTP (not statusline anymore):
 - **Collapsed** — mascot left, session count right
 - **Expanded** (hover) — rate limit bar + sound toggle + settings gear + filter chips (when ≥2 providers active) + collapsible per-provider section list
 - **Finished** (Stop event) — rate limit bar + session card with scrollable response + Done button, auto-collapses in 3s
-- **Permission** — rate limit bar + tool details + 4 buttons (Deny, Allow Once, Allow All, Bypass)
+- **Permission** — rate limit bar + tool details + **provider-aware buttons** (`AIProvider.permissionActions`): Claude/Codex get Deny·Allow Once·Allow All·Bypass; Qwen/Qoder/OpenCode drop Bypass; Cursor/Copilot show Deny·Allow Once·"Decide in <app>" (defers via behavior "ask" + jump); Gemini/Kimi show only Deny·Allow Once. Showing a button the tool can't honor (silent no-op) is worse than omitting it.
 - **Question** — rate limit bar + all questions shown, pill buttons, multi-select (Claude only), Submit All Answers
 
 ## Theming
@@ -178,11 +184,13 @@ Process-based, not time-based. Every 5s, `SessionStore.sweepClosedAgents()` call
 
 ## Mascots
 
-- **Claude**: 13x8 pixel crab from the [Claude Code Mascot Generator](https://claude-code-mascot-generator.replit.app/). Terracotta default, cyan thinking, green idle, red error.
-- **Codex**: pixel terminal box (head bump + body + `>_` face + stubby feet) in 58x52 logical space. Light gray default, sky-blue active.
-- **Gemini**: sparkle (placeholder for future Gemini integration).
+All mascots are Canvas-drawn pixel art in `PixelMascot.swift`, authored in a 52-unit-tall logical space. Each agent has its own `MascotShape` + idle/active `MascotPalette`:
+- **Claude** crab, **Codex** terminal box (these two animate their legs/feet directly).
+- **Gemini** star, **Qwen** gem, **Qoder** blob, **Factory** industrial bot, **CodeBuddy** cat, **Cursor** editor box, **Copilot** goggled bot, **Kimi** lunar orb, **OpenCode** monitor box, **Cline** rounded bot.
 
-Animated bounce when thinking; color swaps via `mascotPalette` vs `activeMascotPalette`.
+The provider mascots are drawn via the shared `drawShape(...)` helper, which applies a **whole-body bounce** when `animate` is true (the "thinking" liveliness) — no per-mascot leg rig. Color swaps via `mascotPalette` vs `activeMascotPalette`; transient statuses (thinking/error/waiting) override the provider palette so status reads at a glance (`SessionMascot.paletteFor`).
+
+Brand-original mascots (no reference art): Qwen, Copilot, Kimi. The rest were ported from the reference repo's gifs into our pixel style.
 
 ## Building
 
@@ -222,17 +230,32 @@ Generated at runtime by `SoundSynthesizer` (8-bit square/triangle/sawtooth waves
 
 ## Hook Installers
 
-Both installers run idempotently on every launch (see `AppDelegate.applicationDidFinishLaunching`).
+Three installers run idempotently on every launch (`AppDelegate.applicationDidFinishLaunching` → `HookInstaller.install()`, `CodexInstaller.install()`, `ProviderInstaller.installAll()`). All preserve foreign hooks, back the original up to `.bak`, and skip the write when nothing changed.
 
-### Claude (`HookInstaller`)
-1. Creates `~/.claude/` if needed (so first-time Claude users work)
-2. Adds/updates hook entries for all event types with `matcher: "*"`
-3. Writes the bridge launcher script at `~/.code-island/bin/code-island-bridge`
+### Claude (`HookInstaller`) — `~/.claude/settings.json`, all events with `matcher: "*"`, launcher `code-island-bridge`.
+### Codex (`CodexInstaller`) — `~/.codex/hooks.json` (nested, no matcher) + `[features].hooks = true` in `config.toml`; launcher `code-island-codex-bridge`. Also persists Allow-All/Bypass as `prefix_rule(...)` (see Codex Permission Persistence).
 
-### Codex (`CodexInstaller`)
-1. Creates `$CODEX_HOME` (default `~/.codex/`) if needed
-2. Writes `~/.codex/hooks.json` in Codex's nested format (no `matcher` field) subscribing to: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, Stop, PermissionRequest, Notification, SubagentStart, SubagentStop, PreCompact
-3. Sets `[features].hooks = true` in `~/.codex/config.toml` (creates the section if missing)
-4. Writes the bridge launcher at `~/.code-island/bin/code-island-codex-bridge` (passes `--source codex`)
+### The other 10 (`ProviderInstaller`, Sources/CodeIsland/Utilities/ProviderInstaller.swift)
+A single descriptor-driven engine. Each provider is a `Descriptor` (source, config path, `Format`, `TimeoutUnit`, events, `createDirIfMissing`, `detectPaths`). Only installs when the tool is present (config dir exists OR a `detectPaths` entry exists), except Factory which bootstraps. `Format` cases:
+- `.claudeFork` — `{matcher:"*", hooks:[{type,command,timeout}]}` per event. **Gemini timeouts are ms**, the rest seconds. (Qwen/Qoder/Factory/CodeBuddy.)
+- `.nested` — like claudeFork without `matcher` (Gemini).
+- `.flat` — `[{command}]`, event via `--event` (Cursor).
+- `.copilot` — `{version:1, hooks:{event:[{type,bash,timeoutSec}]}}`, event via `--event`.
+- `.toml` — Kimi: marker-delimited `[[hooks]]` block appended to `~/.kimi/config.toml` (text merge, not JSON).
+- `.opencodePlugin` — writes a JS plugin to `~/.config/opencode/plugins/codeisland.js` and registers it in `opencode.json`'s `plugin` array (JSONC-tolerant).
+- `.clineScripts` — one executable bash script per event in `~/Documents/Cline/Hooks/` (chmod 0755), each pipes stdin → launcher `--event` and prints `{"cancel":false}`.
 
-Both return `Bool` for success/failure — onboarding shows a checkmark or retry UI based on this.
+`installSource(_:)` force-installs one provider (Settings → Providers reinstall buttons). Returns `Bool` for the onboarding checkmark/retry UI.
+
+## Permission Support per Provider
+
+Only agents with a **selective** permission hook drive the in-notch approve/deny+question UI: **Claude, Codex, Qwen, Qoder** (Claude-shape `PermissionRequest`), and **OpenCode** (plugin handles `permission.asked`). Factory/CodeBuddy use the Claude-fork default event set that omits `PermissionRequest`; Gemini/Cursor/Copilot/Kimi only have blanket "before every tool" hooks (no native selective event); Cline's file hooks are observe-only. (Verified against the reference repo's tested config — don't subscribe forks to `PermissionRequest` speculatively; it risks a hook hang.)
+
+## Strict Approval ("Review every action")
+
+Opt-in, per provider, for the four blanket-hook tools (**Gemini, Cursor, Copilot, Kimi**) that lack a selective permission event. `SettingsStore.strictApproval: [String: Bool]` is persisted to UserDefaults AND mirrored to `~/.code-island/config.json`. The bridge reads that file each run; when a provider's flag is on and the event is one of its gate events (`permissionGateEvents` in main.swift — Gemini `BeforeTool`, Cursor `beforeShellExecution`/`beforeMCPExecution`, Copilot `preToolUse`, Kimi `PreToolUse`), it routes the event through the blocking `PermissionRequest` path and **translates** the app's Claude-shaped decision into the tool's native response (`{"permission":…}` / `{"decision":…}` / `{"permissionDecision":…}` / Kimi's `hookSpecificOutput`). Gate-event hook timeouts are installed long (~5 min) so the prompt has time; off → the bridge returns instantly (today's PreToolUse behavior). Settings → General → "Review every action".
+
+## Onboarding & What's New
+
+- **Onboarding** (`OnboardingWindow.swift`, full-screen cosmic) shows once, gated on `SettingsStore.hasSeenThemeOnboarding`. Has a provider mascot strip + Back button (`reverse`-aware slide).
+- **What's New** (`WhatsNewView`/`WhatsNewWindowController`, same file) — a centered card with the bouncing mascot parade + release highlights. Shown once per version bump, gated on `SettingsStore.lastWhatsNewVersion != updateChecker.currentVersion`. Fresh installs get onboarding only (we stamp the version so they skip What's New). Re-openable anytime via the menu-bar "What's New" item (`MenuBarManager.onShowWhatsNew`).

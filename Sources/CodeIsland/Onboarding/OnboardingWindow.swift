@@ -10,6 +10,7 @@ struct OnboardingView: View {
 
     @State private var step = 0
     @State private var confetti = 0
+    @State private var reverse = false   // drives slide direction (back vs forward)
     private let totalSteps = 4
 
     /// The live theme — the faux notch + theme chips reflect it, and the theme
@@ -29,8 +30,8 @@ struct OnboardingView: View {
                     .frame(maxWidth: 680)
                     .padding(.horizontal, 40)
                     .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
+                        insertion: .move(edge: reverse ? .leading : .trailing).combined(with: .opacity),
+                        removal: .move(edge: reverse ? .trailing : .leading).combined(with: .opacity)
                     ))
                     .id(step)
                 Spacer()
@@ -57,6 +58,24 @@ struct OnboardingView: View {
                 .buttonStyle(.plain)
                 .padding(.top, 16)
                 .padding(.trailing, 20)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if step > 0 {
+                Button(action: goBack) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Back")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(.white.opacity(0.5))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 16)
+                .padding(.leading, 20)
             }
         }
     }
@@ -134,7 +153,7 @@ struct OnboardingView: View {
     private var welcomeStep: some View {
         VStack(spacing: 20) {
             title("Welcome to Code Island")
-            subtitle("Your MacBook's notch is now mission control for Claude Code and Codex — approve permissions, answer questions, and track usage without leaving your editor.")
+            subtitle("Your MacBook's notch is now mission control for your AI coding agents — Claude Code, Codex, Gemini, Cursor, and more. Approve permissions, answer questions, and track usage without leaving your editor.")
             primaryButton("Get Started", action: advance)
         }
     }
@@ -161,12 +180,31 @@ struct OnboardingView: View {
             )
             HStack(spacing: 8) {
                 Image(systemName: "sparkles").foregroundColor(.cyan)
-                Text("Configured for Claude Code & Codex")
+                Text("Auto-detects every agent you have installed")
             }
             .font(.system(size: 12))
             .foregroundColor(.white.opacity(0.6))
+            providerStrip
             primaryButton("Continue", action: advance)
         }
+    }
+
+    /// A wrapping grid of every supported agent's mascot — communicates the
+    /// breadth of provider support at a glance (Claude, Codex, Gemini, …).
+    private var providerStrip: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 62), spacing: 10)], spacing: 12) {
+            ForEach(AIProvider.all) { p in
+                VStack(spacing: 4) {
+                    SessionMascot(status: .idle, size: 22, animated: false, provider: p)
+                        .frame(height: 24)
+                    Text(p.displayName)
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.5))
+                        .lineLimit(1)
+                }
+            }
+        }
+        .frame(maxWidth: 460)
     }
 
     private var themeStep: some View {
@@ -188,7 +226,7 @@ struct OnboardingView: View {
                 .font(.system(size: 52))
                 .foregroundColor(.green)
             title("You're all set!")
-            subtitle("Start Claude Code or Codex and watch the notch come alive.")
+            subtitle("Start any of your coding agents and watch the notch come alive.")
             Toggle(isOn: $settingsStore.launchAtLogin) {
                 HStack(spacing: 8) {
                     Image(systemName: "sunrise.fill")
@@ -308,11 +346,19 @@ struct OnboardingView: View {
     // MARK: - Flow
 
     private func advance() {
+        reverse = false
         withAnimation(.easeInOut(duration: 0.3)) {
             step = min(step + 1, totalSteps - 1)
         }
         if step == totalSteps - 1 {
             confetti += 1
+        }
+    }
+
+    private func goBack() {
+        reverse = true
+        withAnimation(.easeInOut(duration: 0.3)) {
+            step = max(step - 1, 0)
         }
     }
 
@@ -489,6 +535,168 @@ final class OnboardingWindowController: NSWindowController {
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError()
+    }
+}
+
+// MARK: - What's New
+
+/// A compact, centered card shown once per version bump — highlights + the
+/// full cast of mascots bouncing along the top. Reuses the onboarding chrome
+/// (cosmic background, starfield, primary button).
+struct WhatsNewView: View {
+    let version: String
+    let onClose: () -> Void
+
+    private static let accent = Color(red: 1.0, green: 0.541, blue: 0.40)
+
+    private struct Highlight: Identifiable {
+        let id = UUID()
+        let symbol: String
+        let tint: Color
+        let title: String
+        let detail: String
+    }
+
+    private let highlights: [Highlight] = [
+        .init(symbol: "sparkles", tint: Color(red: 0.62, green: 0.42, blue: 1.0),
+              title: "10 new coding agents",
+              detail: "Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot, Kimi, OpenCode & Cline."),
+        .init(symbol: "face.smiling", tint: Color(red: 0.42, green: 0.95, blue: 0.75),
+              title: "A mascot for everyone",
+              detail: "Every agent gets its own animated pixel mascot, themed to its brand."),
+        .init(symbol: "bell.badge", tint: Color(red: 1.0, green: 0.72, blue: 0.30),
+              title: "More in-notch permissions",
+              detail: "Approve / deny & answer questions for Qwen, Qoder & OpenCode — alongside Claude & Codex."),
+        .init(symbol: "lock.shield", tint: Color(red: 0.37, green: 0.78, blue: 1.0),
+              title: "“Review every action” mode",
+              detail: "Optional strict approval for Gemini, Cursor, Copilot & Kimi — in Settings → General."),
+        .init(symbol: "hand.wave", tint: Self.accent,
+              title: "Polished onboarding",
+              detail: "Refreshed welcome flow with a Back button, plus a pile of fixes."),
+    ]
+
+    var body: some View {
+        ZStack {
+            CosmicBackground()
+
+            VStack(spacing: 16) {
+                mascotParade
+                    .padding(.top, 30)
+
+                VStack(spacing: 6) {
+                    Text("What's New")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("Code Island v\(version)")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Capsule().fill(.white.opacity(0.08)))
+                }
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        ForEach(highlights) { highlightRow($0) }
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 4)
+                }
+
+                Button("Let's go", action: onClose)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.bottom, 26)
+            }
+        }
+        .frame(width: 560, height: 640)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 1)
+        )
+    }
+
+    /// All provider mascots in a row, gently bouncing (status = thinking).
+    private var mascotParade: some View {
+        HStack(spacing: 3) {
+            ForEach(AIProvider.all) { p in
+                SessionMascot(status: .thinking, size: 26, animated: true, provider: p)
+            }
+        }
+    }
+
+    private func highlightRow(_ h: Highlight) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: h.symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(h.tint)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(h.tint.opacity(0.14)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(h.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(h.detail)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.6))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(.white.opacity(0.07), lineWidth: 1)
+                )
+        )
+    }
+}
+
+final class WhatsNewWindowController: NSWindowController {
+    init(version: String, onClose: @escaping () -> Void) {
+        let size = NSSize(width: 560, height: 640)
+        let screenFrame = (NSScreen.main ?? NSScreen.screens.first)?.frame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let origin = NSPoint(x: screenFrame.midX - size.width / 2,
+                             y: screenFrame.midY - size.height / 2)
+
+        let window = OnboardingPanel(
+            contentRect: NSRect(origin: origin, size: size),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
+        window.level = NSWindow.Level(rawValue: 101)
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+
+        let view = WhatsNewView(version: version, onClose: {
+            window.orderOut(nil)
+            window.close()
+            onClose()
+        })
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(origin: .zero, size: size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+
+        super.init(window: window)
+    }
+
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        window?.center()
+        window?.makeKeyAndOrderFront(sender)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @available(*, unavailable)

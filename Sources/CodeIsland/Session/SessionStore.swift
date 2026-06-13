@@ -179,8 +179,23 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    /// The canonical events the store understands. Every provider bridge
+    /// normalizes its native vocabulary to one of these before sending; a
+    /// message arriving with a raw, un-normalized name (e.g. Cursor's
+    /// "beforeSubmitPrompt"/"stop") bypassed our normalization and belongs to
+    /// a foreign/misconfigured integration sharing the socket — drop it so it
+    /// can't create phantom sessions or clobber a correctly-attributed one.
+    private static let canonicalEvents: Set<String> = [
+        "SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+        "PermissionRequest", "Stop", "Notification", "SubagentStart", "SubagentStop", "PreCompact",
+    ]
+
     func handleMessage(_ message: BridgeMessage, respond: ((BridgeResponse) -> Void)?, respondRaw: ((Data) -> Void)? = nil) {
         let sessionId = message.sessionId
+        guard Self.canonicalEvents.contains(message.hookEvent) else {
+            Log.info("Ignoring non-canonical event '\(message.hookEvent)' from source=\(message.source ?? "?") session=\(sessionId.prefix(8))")
+            return
+        }
         ensureSession(message)
         // A late buffered hook may arrive after we've marked a session
         // .completed and scheduled removal. Cancel the pending removal so
@@ -392,6 +407,15 @@ final class SessionStore: ObservableObject {
                             } else {
                                 respond?(BridgeResponse.allow())
                             }
+                        case .deferToApp:
+                            // behavior "ask" → the bridge translates this to the
+                            // tool's native defer (Cursor "ask" / Copilot "ask"),
+                            // so the agent shows its own prompt; we also jump to it.
+                            if let data = BridgeResponse.deferToTerminal(), respondRaw != nil {
+                                respondRaw?(data)
+                            } else {
+                                respond?(BridgeResponse.allow())
+                            }
                         }
                     }
                 )
@@ -475,11 +499,16 @@ final class SessionStore: ObservableObject {
 
     func respondToPermission(sessionId: String, action: PermissionAction) {
         guard let pending = sessions[sessionId]?.pendingPermission else { return }
+        let session = sessions[sessionId]
         // Clear immediately so nextPendingPermission() won't find it again
         sessions[sessionId]?.pendingPermission = nil
         sessions[sessionId]?.status = .thinking
         pending.respond(action)
         onEvent.send(.permissionResponded(sessionId, action != .deny))
+        // Defer-to-app: surface the tool so the user can answer its own prompt.
+        if action == .deferToApp, let session {
+            TerminalJumper.jump(to: session)
+        }
     }
 
     /// Apply renamed Codex session titles fetched from the codex app-server.

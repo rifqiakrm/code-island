@@ -1191,7 +1191,7 @@ section h2 {
 }
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
   gap: 32px;
   margin-bottom: 40px;
 }

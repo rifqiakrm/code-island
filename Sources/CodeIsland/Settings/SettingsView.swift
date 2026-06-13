@@ -61,7 +61,7 @@ struct SettingsView: View {
 
     @State private var selection: SettingsSection = .general
 
-    /// "v1.2.1" when bundled normally; "dev" when run from `swift run` /
+    /// "v1.3.0" when bundled normally; "dev" when run from `swift run` /
     /// `.build/debug/CodeIsland` (no Info.plist version baked in).
     private var displayVersion: String {
         let v = updateChecker.currentVersion
@@ -276,6 +276,11 @@ struct SettingsView: View {
 
     // MARK: - General
 
+    /// Two-way binding into the per-provider strict-approval map.
+    private func strictBinding(_ id: String) -> Binding<Bool> {
+        Binding(get: { settingsStore.isStrict(id) }, set: { settingsStore.setStrict(id, $0) })
+    }
+
     @ViewBuilder
     private var generalForm: some View {
         Section("System") {
@@ -293,6 +298,24 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
             }
+        }
+
+        Section {
+            ForEach(SettingsStore.strictApprovalProviders, id: \.self) { id in
+                let provider = AIProvider.from(id)
+                Toggle(isOn: strictBinding(id)) {
+                    HStack(spacing: 8) {
+                        ProviderIcon(provider: provider, size: 15)
+                        Text(provider.displayName)
+                    }
+                }
+            }
+        } header: {
+            Text("Review every action")
+        } footer: {
+            Text("Gemini, Cursor, Copilot, and Kimi have no native permission prompt — only blanket \"before every tool\" hooks. Turn one on to pause that agent on every tool call for in-notch approval. Off by default: when on you'll be prompted a lot, and if you don't answer before the hook times out (~5 min) the action proceeds.")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
         }
 
         Section("Updates") {
@@ -432,6 +455,66 @@ struct SettingsView: View {
                 accent: Color(red: 0.88, green: 0.88, blue: 0.88),
                 install: { CodexInstaller.install() }
             )
+            IntegrationRow(
+                title: "Gemini",
+                subtitle: "Writes hooks to ~/.gemini/settings.json.",
+                accent: Color(red: 0.278, green: 0.588, blue: 0.894),
+                install: { ProviderInstaller.installSource("gemini") }
+            )
+            IntegrationRow(
+                title: "Qwen Code",
+                subtitle: "Writes hooks to ~/.qwen/settings.json.",
+                accent: Color(red: 0.486, green: 0.228, blue: 0.929),
+                install: { ProviderInstaller.installSource("qwen") }
+            )
+            IntegrationRow(
+                title: "Qoder",
+                subtitle: "Writes hooks to ~/.qoder/settings.json.",
+                accent: Color(red: 0.165, green: 0.859, blue: 0.361),
+                install: { ProviderInstaller.installSource("qoder") }
+            )
+            IntegrationRow(
+                title: "Factory",
+                subtitle: "Writes hooks to ~/.factory/settings.json (droid CLI).",
+                accent: Color(red: 0.835, green: 0.416, blue: 0.149),
+                install: { ProviderInstaller.installSource("droid") }
+            )
+            IntegrationRow(
+                title: "CodeBuddy",
+                subtitle: "Writes hooks to ~/.codebuddy/settings.json.",
+                accent: Color(red: 0.424, green: 0.302, blue: 1.000),
+                install: { ProviderInstaller.installSource("codebuddy") }
+            )
+            IntegrationRow(
+                title: "Cursor",
+                subtitle: "Writes hooks to ~/.cursor/hooks.json.",
+                accent: Color(red: 0.60, green: 0.58, blue: 0.54),
+                install: { ProviderInstaller.installSource("cursor") }
+            )
+            IntegrationRow(
+                title: "Copilot",
+                subtitle: "Writes hooks to ~/.copilot/hooks/codeisland.json.",
+                accent: Color(red: 0.800, green: 0.200, blue: 0.400),
+                install: { ProviderInstaller.installSource("copilot") }
+            )
+            IntegrationRow(
+                title: "Kimi",
+                subtitle: "Appends [[hooks]] blocks to ~/.kimi/config.toml.",
+                accent: Color(red: 0.29, green: 0.56, blue: 1.000),
+                install: { ProviderInstaller.installSource("kimi") }
+            )
+            IntegrationRow(
+                title: "OpenCode",
+                subtitle: "Installs a plugin in ~/.config/opencode and registers it.",
+                accent: Color(red: 0.62, green: 0.62, blue: 0.64),
+                install: { ProviderInstaller.installSource("opencode") }
+            )
+            IntegrationRow(
+                title: "Cline",
+                subtitle: "Writes hook scripts to ~/Documents/Cline/Hooks.",
+                accent: Color(red: 0.00, green: 0.70, blue: 0.49),
+                install: { ProviderInstaller.installSource("cline") }
+            )
         } header: {
             Text("Providers")
         } footer: {
@@ -475,6 +558,17 @@ struct SettingsView: View {
             LinkRow(label: "GitHub repository", url: URL(string: "https://github.com/rifqiakrm/code-island")!)
             LinkRow(label: "Report an issue",   url: URL(string: "https://github.com/rifqiakrm/code-island/issues")!)
             LinkRow(label: "License",           url: URL(string: "https://github.com/rifqiakrm/code-island/blob/main/LICENSE")!)
+        }
+
+        Section {
+            LinkRow(label: "Support on Ko-fi ☕", url: URL(string: "https://ko-fi.com/rifqiakrm")!)
+            LinkRow(label: "Donate via PayPal",   url: URL(string: "https://paypal.me/rifqiakrm")!)
+        } header: {
+            Text("Support the project")
+        } footer: {
+            Text("Code Island is free & open source. If you'd like to support development, it's hugely appreciated — and totally optional. ♥")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
         }
     }
 

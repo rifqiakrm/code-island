@@ -20,11 +20,14 @@ enum SessionStatus: String, Codable, Equatable {
     }
 }
 
-enum PermissionAction {
+enum PermissionAction: Hashable {
     case deny
     case allowOnce
     case allowAll
     case bypass
+    /// Defer to the tool's own prompt (behavior "ask") and jump to it. Used by
+    /// providers whose hooks only support allow/deny/ask (Cursor, Copilot).
+    case deferToApp
 }
 
 struct PendingPermission {

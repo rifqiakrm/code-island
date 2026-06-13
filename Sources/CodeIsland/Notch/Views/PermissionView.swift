@@ -161,25 +161,31 @@ struct PermissionView: View {
 
             Spacer(minLength: 12)
 
-            // 4 compact action buttons
+            // Provider-aware action buttons — only what the tool's hook supports.
             HStack(spacing: 6) {
-                ActionButton(icon: "xmark", label: "Deny", hint: "", color: Color(red: 0.92, green: 0.55, blue: 0.55)) {
-                    onRespond(.deny)
-                }
-                ActionButton(icon: "checkmark", label: "Allow Once", hint: "", color: Color(red: 0.45, green: 0.78, blue: 0.86)) {
-                    onRespond(.allowOnce)
-                }
-                ActionButton(icon: "checkmark.circle", label: "Allow All", hint: "", color: Color(red: 0.55, green: 0.78, blue: 0.55)) {
-                    onRespond(.allowAll)
-                }
-                ActionButton(icon: "bolt", label: "Bypass", hint: "", color: Color(red: 0.70, green: 0.62, blue: 0.92)) {
-                    onRespond(.bypass)
+                ForEach(session.provider.permissionActions, id: \.self) { action in
+                    let b = Self.actionConfig(for: action, provider: session.provider)
+                    ActionButton(icon: b.icon, label: b.label, hint: "", color: b.color) {
+                        onRespond(action)
+                    }
                 }
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Icon / label / color for each permission action. `deferToApp` is labeled
+    /// per provider (e.g. "Decide in Cursor").
+    static func actionConfig(for action: PermissionAction, provider: AIProvider) -> (icon: String, label: String, color: Color) {
+        switch action {
+        case .deny:       return ("xmark", "Deny", Color(red: 0.92, green: 0.55, blue: 0.55))
+        case .allowOnce:  return ("checkmark", "Allow Once", Color(red: 0.45, green: 0.78, blue: 0.86))
+        case .allowAll:   return ("checkmark.circle", "Allow All", Color(red: 0.55, green: 0.78, blue: 0.55))
+        case .bypass:     return ("bolt", "Bypass", Color(red: 0.70, green: 0.62, blue: 0.92))
+        case .deferToApp: return ("arrow.up.forward.app", "Decide in \(provider.displayName)", Color(red: 0.70, green: 0.62, blue: 0.92))
+        }
     }
 
     private func subtitleForTool(_ tool: String) -> String {
