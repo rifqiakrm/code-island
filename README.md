@@ -1,10 +1,20 @@
-# Code Island
+<div align="center">
 
-A native macOS app that turns your MacBook's notch into a live dashboard for your AI coding agents. Approve permissions, answer questions, track rate limits, and jump between terminals — all from the notch.
+<img src="design/logo.png" alt="Code Island" width="116" />
 
-Works with **Claude Code** and **OpenAI Codex** out of the box.
+<h1>Code Island</h1>
 
-![Code Island](design/logo.png)
+<p><b>Turn your MacBook's notch into a live dashboard for your AI coding agents.</b></p>
+
+<p>Approve permissions, answer questions, track rate limits, and jump between<br/>terminals — all from the notch. Works with <b>Claude Code</b> and <b>OpenAI Codex</b> out of the box.</p>
+
+<p>
+<img src="https://img.shields.io/badge/macOS-14%2B-1d1d1f?logo=apple&logoColor=white" alt="macOS 14+" />
+<img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.9+" />
+<img src="https://img.shields.io/badge/license-personal%20use-5b8def" alt="License: personal use" />
+</p>
+
+</div>
 
 ## Features
 
