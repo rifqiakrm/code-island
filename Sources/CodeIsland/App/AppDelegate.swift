@@ -137,18 +137,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         codexAppServer.start()
 
-        // Show onboarding on first launch
-        if !settingsStore.hasCompletedOnboarding {
+        // Show the (redesigned) onboarding when the user hasn't seen it yet —
+        // fresh installs AND existing users updating into this version. Gated on
+        // its own flag so it shows exactly once, never again on later updates.
+        if !settingsStore.hasSeenThemeOnboarding {
             showOnboarding()
         }
 
-        // Auto update check — silent unless a newer release is found, and
-        // runs at most once per week.
+        // Auto update check — silent unless a newer release is found. Checks
+        // shortly after launch, then re-evaluates every few hours so a
+        // long-running menu-bar session still gets a daily check (the check is
+        // gated to at most once/day internally).
         Task {
             // Delay a few seconds so the notch is up and the user isn't
             // greeted by a popup the instant they launch.
             try? await Task.sleep(for: .seconds(8))
             await updateChecker.checkOnLaunchIfDue()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(6 * 60 * 60))
+                await updateChecker.checkOnLaunchIfDue()
+            }
         }
     }
 

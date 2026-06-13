@@ -46,6 +46,10 @@ struct NotchBackground: View {
     var theme: NotchTheme = .defaultTheme
     let isExpanded: Bool
     let cornerRadius: CGFloat
+    /// When false, only the fill is drawn (the parent draws the border on top of
+    /// its content instead, so scrolling cards can't cover the window edge).
+    /// Defaults true for standalone uses (onboarding faux notch, theme previews).
+    var drawBorder: Bool = true
 
     var body: some View {
         if isExpanded {
@@ -53,12 +57,21 @@ struct NotchBackground: View {
             // must stay pure black with no border so it blends seamlessly into
             // the hardware notch — a tinted fill or edge reads as a pasted-on
             // widget and breaks the illusion.
-            fill.overlay(border)
+            if drawBorder {
+                fill.overlay(border)
+            } else {
+                fill
+            }
         } else {
             NotchShape(cornerRadius: cornerRadius)
                 .fill(.black)
         }
     }
+
+    /// The window edge border, exposed so a parent can render it on top of its
+    /// own content (z-order fix for thick Pixel/Brutalist borders).
+    @ViewBuilder
+    var borderOverlay: some View { border }
 
     @ViewBuilder
     private var fill: some View {

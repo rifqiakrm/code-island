@@ -22,6 +22,14 @@ final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding") }
     }
 
+    /// Whether the user has seen the redesigned (themed, full-screen) onboarding.
+    /// Separate from `hasCompletedOnboarding` so existing users — who already
+    /// completed the OLD onboarding — get shown the new one once on update, then
+    /// never again. Fresh installs see it via this flag being false too.
+    @Published var hasSeenThemeOnboarding: Bool {
+        didSet { UserDefaults.standard.set(hasSeenThemeOnboarding, forKey: "hasSeenThemeOnboarding") }
+    }
+
     /// Selected visual theme for the notch windows. Persisted by raw value.
     @Published var notchThemeID: NotchThemeID {
         didSet { UserDefaults.standard.set(notchThemeID.rawValue, forKey: "notchThemeID") }
@@ -60,6 +68,7 @@ final class SettingsStore: ObservableObject {
             "soundError": true,
             "soundPermission": true,
             "notchThemeID": NotchThemeID.default.rawValue,
+            "hasSeenThemeOnboarding": false,
         ])
 
         self.soundEnabled = defaults.bool(forKey: "soundEnabled")
@@ -73,6 +82,7 @@ final class SettingsStore: ObservableObject {
         self.soundError = defaults.bool(forKey: "soundError")
         self.soundPermission = defaults.bool(forKey: "soundPermission")
         self.notchThemeID = NotchThemeID(rawValue: defaults.string(forKey: "notchThemeID") ?? "") ?? .default
+        self.hasSeenThemeOnboarding = defaults.bool(forKey: "hasSeenThemeOnboarding")
     }
 
     private func updateLoginItem() {

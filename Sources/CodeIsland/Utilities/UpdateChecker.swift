@@ -1,8 +1,9 @@
 import Foundation
 import AppKit
 
-/// Checks GitHub releases for a newer version. Runs silently on launch (at
-/// most once per week) and can be triggered manually from Settings. Anonymous
+/// Checks GitHub releases for a newer version. Runs silently on launch and on a
+/// daily timer (at most once per day) and can be triggered manually from
+/// Settings. Anonymous
 /// — uses the public Releases API, no auth or telemetry.
 @MainActor
 final class UpdateChecker: ObservableObject {
@@ -18,6 +19,7 @@ final class UpdateChecker: ObservableObject {
     private let lastCheckKey = "updateChecker.lastCheckedAt"
     private let lastSeenKey = "updateChecker.lastSeenVersion"
     private let autoCheckKey = "updateChecker.autoCheckEnabled"
+    private let remindLaterKey = "updateChecker.remindLaterUntil"
 
     var currentVersion: String {
         (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0.0"
@@ -34,12 +36,13 @@ final class UpdateChecker: ObservableObject {
         }
     }
 
-    /// Called from AppDelegate at launch. Only runs if auto-check is on and
-    /// the last check was > 7 days ago. Silent: no popup if nothing's new.
+    /// Called from AppDelegate at launch and on a daily timer. Only runs if
+    /// auto-check is on and the last check was > 1 day ago. Silent: no popup if
+    /// nothing's new.
     func checkOnLaunchIfDue() async {
         guard autoCheckEnabled else { return }
-        let weekAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
-        if let last = lastCheckedAt, last > weekAgo { return }
+        let dayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+        if let last = lastCheckedAt, last > dayAgo { return }
         await checkForUpdates(showNoUpdateAlert: false)
     }
 
@@ -70,11 +73,16 @@ final class UpdateChecker: ObservableObject {
             lastCheckedAt = Date()
             defaults.set(Date(), forKey: lastCheckKey)
             if Self.isNewer(latest: tag, current: currentVersion) {
-                // Always notify on a new version. Suppress only if user
-                // already dismissed THIS specific version.
-                let lastSeen = defaults.string(forKey: lastSeenKey) ?? ""
-                if !showNoUpdateAlert && lastSeen == tag {
-                    return  // they've seen it; don't nag again until next release
+                // On the auto path, suppress the popup if the user skipped this
+                // version, or asked to be reminded later and the week isn't up.
+                // The manual "Check Now" path (showNoUpdateAlert) always shows.
+                if !showNoUpdateAlert {
+                    let lastSeen = defaults.string(forKey: lastSeenKey) ?? ""
+                    if lastSeen == tag { return }   // skipped this version
+                    if let snoozeUntil = defaults.object(forKey: remindLaterKey) as? Date,
+                       Date() < snoozeUntil {
+                        return                       // "remind me later" week not elapsed
+                    }
                 }
                 presentUpdateAlert(latest: tag, body: parsed.body ?? "")
             } else if showNoUpdateAlert {
@@ -155,7 +163,8 @@ final class UpdateChecker: ObservableObject {
             // Suppress popups for this version until a newer one releases
             defaults.set(latest, forKey: lastSeenKey)
         default:
-            break  // "Later" — pop up again on next weekly check
+            // "Remind Me Later" — snooze the auto popup for a week.
+            defaults.set(Date().addingTimeInterval(7 * 24 * 60 * 60), forKey: remindLaterKey)
         }
     }
 

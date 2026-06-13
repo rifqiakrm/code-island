@@ -61,7 +61,7 @@ struct SettingsView: View {
 
     @State private var selection: SettingsSection = .general
 
-    /// "v1.2.0" when bundled normally; "dev" when run from `swift run` /
+    /// "v1.2.1" when bundled normally; "dev" when run from `swift run` /
     /// `.build/debug/CodeIsland` (no Info.plist version baked in).
     private var displayVersion: String {
         let v = updateChecker.currentVersion
@@ -321,7 +321,7 @@ struct SettingsView: View {
                 set: { updateChecker.autoCheckEnabled = $0 }
             )) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Check for updates weekly")
+                    Text("Check for updates daily")
                     if let last = updateChecker.lastCheckedAt {
                         Text("Last checked \(last.formatted(date: .abbreviated, time: .shortened))")
                             .font(.system(size: 11))

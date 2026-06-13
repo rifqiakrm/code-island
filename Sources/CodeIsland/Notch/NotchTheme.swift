@@ -396,15 +396,17 @@ extension View {
             ?? theme.neutralCardStroke
         return self
             .background(
+                // Fill + shadow sit BEHIND the content. (Shadow on the shape, not
+                // `self` — otherwise SwiftUI ghosts every glyph inside the card.)
                 RoundedRectangle(cornerRadius: theme.cardRadius, style: .continuous)
                     .fill(fill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: theme.cardRadius, style: .continuous)
-                            .strokeBorder(stroke, lineWidth: theme.strokeWidth)
-                    )
-                    // Shadow lives on the SHAPE, not `self` — otherwise SwiftUI
-                    // casts a hard offset ghost of every glyph inside the card.
                     .modifier(SurfaceShadow(shadow: resolvedShadow(theme, tint: tint)))
+            )
+            .overlay(
+                // Border sits ON TOP of the content so pills/text never break the
+                // edge line (most visible with the thick Brutalist border).
+                RoundedRectangle(cornerRadius: theme.cardRadius, style: .continuous)
+                    .strokeBorder(stroke, lineWidth: theme.strokeWidth)
             )
     }
 
@@ -414,11 +416,11 @@ extension View {
             .background(
                 RoundedRectangle(cornerRadius: theme.boxRadius, style: .continuous)
                     .fill(theme.boxFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: theme.boxRadius, style: .continuous)
-                            .strokeBorder(theme.boxStroke, lineWidth: theme.strokeWidth)
-                    )
                     .modifier(SurfaceShadow(shadow: theme.surfaceShadow))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: theme.boxRadius, style: .continuous)
+                    .strokeBorder(theme.boxStroke, lineWidth: theme.strokeWidth)
             )
     }
 
@@ -446,13 +448,13 @@ extension View {
             .background(
                 RoundedRectangle(cornerRadius: theme.buttonRadius, style: .continuous)
                     .fill(fill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: theme.buttonRadius, style: .continuous)
-                            .strokeBorder(stroke ?? .clear, lineWidth: stroke == nil ? 0 : theme.strokeWidth)
-                    )
                     // Tint the hard shadow to the button's own colour (Pixel) so
                     // it reads on the dark window; Brutalist keeps its white offset.
                     .modifier(SurfaceShadow(shadow: resolvedShadow(theme, tint: stroke ?? fill)))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: theme.buttonRadius, style: .continuous)
+                    .strokeBorder(stroke ?? .clear, lineWidth: stroke == nil ? 0 : theme.strokeWidth)
             )
     }
 }

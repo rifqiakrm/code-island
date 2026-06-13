@@ -15,7 +15,8 @@ struct NotchContentView: View {
             NotchBackground(
                 theme: theme,
                 isExpanded: viewModel.isExpanded,
-                cornerRadius: viewModel.isExpanded ? 20 : 17
+                cornerRadius: viewModel.isExpanded ? 20 : 17,
+                drawBorder: false
             )
 
             content
@@ -23,6 +24,15 @@ struct NotchContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(NotchShape(cornerRadius: viewModel.isExpanded ? 20 : 14))
+        // Window edge border ON TOP of the content so cards/wells that reach the
+        // panel bottom tuck under it instead of spilling over the rounded edge
+        // (z-order fix — most visible with the thick Pixel/Brutalist borders).
+        .overlay {
+            if viewModel.isExpanded, theme.windowStroke != nil {
+                NotchBorderShape(cornerRadius: viewModel.isExpanded ? 20 : 14)
+                    .stroke(theme.windowStroke ?? .clear, lineWidth: theme.windowStrokeWidth * 2)
+            }
+        }
         .environment(\.notchTheme, theme)
         .onHover { hovering in
             if hovering {
