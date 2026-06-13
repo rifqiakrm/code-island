@@ -6,7 +6,7 @@
 
 <p><b>Turn your MacBook's notch into a live dashboard for your AI coding agents.</b></p>
 
-<p>Approve permissions, answer questions, track rate limits, and jump between<br/>terminals — all from the notch. Works with <b>21 AI coding agents</b> — Claude Code, Codex, Gemini, Cursor, Copilot, and more — out of the box.</p>
+<p>Approve permissions, answer questions, track rate limits, and jump between<br/>terminals — all from the notch. Works with <b>17 AI coding agents</b> — Claude Code, Codex, Gemini, Cursor, Copilot, and more — out of the box.</p>
 
 <p>
 <img src="https://img.shields.io/badge/macOS-14%2B-1d1d1f?logo=apple&logoColor=white" alt="macOS 14+" />
@@ -18,7 +18,7 @@
 
 ## Features
 
-- **21 AI coding agents** — Claude Code, Codex, Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot, Kimi, OpenCode, Cline, Trae, TraeCli, Kiro, Pi, Oh My Pi, StepFun, AntiGravity, WorkBuddy, and Hermes — side by side in one notch
+- **17 AI coding agents** — Claude Code, Codex, Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot, Kimi, OpenCode, Cline, Kiro, Pi, Oh My Pi, AntiGravity, and Hermes — side by side in one notch
 - **Live session tracking** — every running agent visible at a glance, grouped by provider
 - **Permission UI** — approve, deny, allow-all, or bypass from the notch without switching apps
 - **Question UI** — Claude's `AskUserQuestion` and Codex's `request_user_input` surfaced inline; click to answer (Claude) or jump to the app (Codex)
@@ -49,19 +49,15 @@ Code Island auto-installs hooks for every agent it detects on launch — install
 | <img src="docs/mascots/kimi.png" width="28"/> | <img src="Resources/cli-icons/kimi.png" width="15"/> **Kimi Code CLI** | 10 | ✅ | — |
 | <img src="docs/mascots/opencode.png" width="28"/> | <img src="Resources/cli-icons/opencode.png" width="15"/> **OpenCode** | all | ✅ | ✅ |
 | <img src="docs/mascots/cline.png" width="28"/> | <img src="Resources/cli-icons/cline.png" width="15"/> **Cline** | 8 | ✅ | — |
-| <img src="docs/mascots/trae.png" width="28"/> | <img src="Resources/cli-icons/trae.png" width="15"/> **Trae** | 10 | ✅ | — |
-| <img src="docs/mascots/traecli.png" width="28"/> | <img src="Resources/cli-icons/traecli.png" width="15"/> **TraeCli** | 12 | ✅ | — |
 | <img src="docs/mascots/kiro.png" width="28"/> | <img src="Resources/cli-icons/kiro.png" width="15"/> **Kiro** | 5 | ✅ | — |
 | <img src="docs/mascots/pi.png" width="28"/> | <img src="Resources/cli-icons/pi.png" width="15"/> **Pi** | all | ✅ | ✅ |
 | <img src="docs/mascots/omp.png" width="28"/> | <img src="Resources/cli-icons/omp.png" width="15"/> **Oh My Pi** | all | ✅ | ✅ |
-| <img src="docs/mascots/stepfun.png" width="28"/> | <img src="Resources/cli-icons/stepfun.png" width="15"/> **StepFun** | 10 | ✅ | — |
-| <img src="docs/mascots/antigravity.png" width="28"/> | <img src="Resources/cli-icons/antigravity.png" width="15"/> **AntiGravity** | 10 | ✅ | — |
-| <img src="docs/mascots/workbuddy.png" width="28"/> | <img src="Resources/cli-icons/workbuddy.png" width="15"/> **WorkBuddy** | 10 | ✅ | — |
-| <img src="docs/mascots/hermes.png" width="28"/> | <img src="Resources/cli-icons/hermes.png" width="15"/> **Hermes** | 10 | ✅ | — |
+| <img src="docs/mascots/antigravity.png" width="28"/> | <img src="Resources/cli-icons/antigravity.png" width="15"/> **AntiGravity** | 4 | ✅ | — |
+| <img src="docs/mascots/hermes.png" width="28"/> | <img src="Resources/cli-icons/hermes.png" width="15"/> **Hermes** | 5 | ✅ | — |
 
 **Jump-to works for every agent** — there's no per-tool jump config. The bridge tags each session with the host app it detected by walking the process tree, and clicking a card brings you straight there. **iTerm2, Terminal.app, Ghostty, JetBrains IDEs, VS Code, Cursor, and Windsurf** get tab/window-level precision; any other terminal or app is brought to the front.
 
-**Permission / question UI** ✅ marks the agents that surface approve/deny (and questions) directly in the notch — Claude, Codex, Qwen, Qoder, OpenCode, and Pi / Oh My Pi (the last two prompt on risky shell commands). Gemini, Cursor, Trae, Copilot, and Kimi expose only blanket "before every tool" hooks — turn those into prompts with the opt-in **"Review every action"** mode (Settings → General). The rest (Factory, CodeBuddy, Cline, TraeCli, Kiro, StepFun, AntiGravity, WorkBuddy, Hermes) handle approvals in-tool; Code Island still tracks their sessions, tools, and completions.
+**Permission / question UI** ✅ marks the agents that surface approve/deny (and questions) directly in the notch — Claude, Codex, Qwen, Qoder, OpenCode, and Pi / Oh My Pi (the last two prompt on risky shell commands). Gemini, Cursor, Copilot, Kimi, and AntiGravity expose only blanket "before every tool" hooks — turn those into prompts with the opt-in **"Review every action"** mode (Settings → General). The rest (Factory, CodeBuddy, Cline, Kiro, Hermes) handle approvals in-tool; Code Island still tracks their sessions, tools, and completions.
 
 ## Requirements
 
@@ -154,9 +150,9 @@ See [CLAUDE.md](CLAUDE.md) for detailed architecture notes, IPC payload shapes, 
 
 ## Contributing
 
-PRs welcome! Code Island already ships 21 agents (see [Supported Tools](#supported-tools)) — here's where help is most useful:
+PRs welcome! Code Island already ships 17 agents (see [Supported Tools](#supported-tools)) — here's where help is most useful:
 
-**Add another provider.** 21 agents ship today; **DeepSeek** and **Amp** are the notable holdouts (DeepSeek has no official hookable CLI; Amp needs a dedicated plugin — both deferred to avoid shipping a flaky integration). Adding a new one is mostly data + a mascot:
+**Add another provider.** 17 agents ship today; **DeepSeek** and **Amp** are the notable holdouts (DeepSeek has no official hookable CLI; Amp needs a dedicated plugin — both deferred to avoid shipping a flaky integration). Adding a new one is mostly data + a mascot:
 
 1. An `AIProvider` entry (id, accent color, mascot) in `Sources/CodeIsland/Session/AIProvider.swift`
 2. A `PixelMascot` shape + idle/active palette in `Sources/CodeIsland/Notch/Views/PixelMascot.swift`

@@ -576,8 +576,8 @@ struct WhatsNewView: View {
 
     private let highlights: [Highlight] = [
         .init(symbol: "sparkles", tint: Color(red: 0.62, green: 0.42, blue: 1.0),
-              title: "21 coding agents, one notch",
-              detail: "Claude, Codex, Gemini, Cursor, Copilot, Trae, Kiro, Pi, Qwen, Qoder, Factory, CodeBuddy, Kimi, OpenCode, Cline & more — side by side."),
+              title: "17 coding agents, one notch",
+              detail: "Claude, Codex, Gemini, Cursor, Copilot, Kiro, Pi, Qwen, Qoder, Factory, CodeBuddy, Kimi, OpenCode, Cline & more — side by side."),
         .init(symbol: "face.smiling", tint: Color(red: 0.42, green: 0.95, blue: 0.75),
               title: "A mascot for everyone",
               detail: "Every agent gets its own animated pixel mascot and logo, themed to its brand."),
@@ -586,7 +586,7 @@ struct WhatsNewView: View {
               detail: "Approve, deny, or answer questions right in the notch — with the buttons each tool actually supports."),
         .init(symbol: "lock.shield", tint: Color(red: 0.37, green: 0.78, blue: 1.0),
               title: "“Review every action” mode",
-              detail: "Optional strict approval for agents without a native prompt (Gemini, Cursor, Trae, Copilot, Kimi) — Settings → General."),
+              detail: "Optional strict approval for agents without a native prompt (Gemini, Cursor, Copilot, Kimi, AntiGravity) — Settings → General."),
         .init(symbol: "hand.wave", tint: Self.accent,
               title: "Refreshed onboarding",
               detail: "A new welcome flow with a Back button, this What's New card, plus a pile of fixes."),

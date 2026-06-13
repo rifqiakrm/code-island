@@ -26,13 +26,9 @@ struct PixelMascot: View {
         case kimiMoon    // Kimi — dark navy orb with a glowing crescent + eyes
         case openCodeMark // OpenCode — dark terminal box w/ "-O-" face + feet
         case clineBot    // Cline — rounded green bot, head knob, side ears, tall eyes
-        case traeRocket  // Trae — coral rocket w/ porthole eye + fins + flame
-        case traeBolt    // TraeCli — red terminal box w/ ">_" prompt face
         case kiroGhost   // Kiro — violet friendly ghost w/ wavy tail
         case piGlyph     // Pi / Oh My Pi — π-shaped two-legged creature
-        case stepfunStairs // StepFun — indigo rising staircase topped by a star
         case antigravityOrbit // AntiGravity — blue planet floating in an orbit ring
-        case workbuddyPal // WorkBuddy — blue buddy w/ headset + smile
         case hermesWing  // Hermes — gold winged messenger helmet
     }
 
@@ -41,13 +37,13 @@ struct PixelMascot: View {
         case claude, codex, gemini
         case qwen, qoder, factory, codebuddy, cursor, copilot
         case kimi, opencode, cline
-        case trae, traecli, kiro, pi, omp, stepfun, antigravity, workbuddy, hermes
+        case kiro, pi, omp, antigravity, hermes
         // Brand-tinted "active" palettes (thinking / using a tool)
         case claudeActive, codexActive, geminiActive
         case qwenActive, qoderActive, factoryActive, codebuddyActive, cursorActive, copilotActive
         case kimiActive, opencodeActive, clineActive
-        case traeActive, traecliActive, kiroActive, piActive, ompActive
-        case stepfunActive, antigravityActive, workbuddyActive, hermesActive
+        case kiroActive, piActive, ompActive
+        case antigravityActive, hermesActive
         // Universal semantic palettes
         case error
         case waiting
@@ -78,22 +74,14 @@ struct PixelMascot: View {
             case .opencodeActive:   return Color(red: 0.345, green: 0.345, blue: 0.365)  // lighter when active
             case .cline:            return Color(red: 0.00, green: 0.70, blue: 0.49)  // Cline green #00B37D
             case .clineActive:      return Color(red: 0.20, green: 0.90, blue: 0.66)  // brighter green
-            case .trae:             return Color(red: 0.953, green: 0.286, blue: 0.275)
-            case .traeActive:       return Color(red: 1.000, green: 0.475, blue: 0.353)
-            case .traecli:          return Color(red: 0.94, green: 0.18, blue: 0.14)
-            case .traecliActive:    return Color(red: 1.00, green: 0.42, blue: 0.36)
             case .kiro:             return Color(red: 0.49, green: 0.36, blue: 1.00)
             case .kiroActive:       return Color(red: 0.64, green: 0.54, blue: 1.00)
             case .pi:               return Color(red: 0.96, green: 0.69, blue: 0.13)
             case .piActive:         return Color(red: 1.00, green: 0.82, blue: 0.36)
             case .omp:              return Color(red: 0.13, green: 0.78, blue: 0.74)
             case .ompActive:        return Color(red: 0.34, green: 0.92, blue: 0.88)
-            case .stepfun:          return Color(red: 0.247, green: 0.318, blue: 0.953)
-            case .stepfunActive:    return Color(red: 0.435, green: 0.494, blue: 1.000)
             case .antigravity:      return Color(red: 0.259, green: 0.522, blue: 0.957)
             case .antigravityActive: return Color(red: 0.451, green: 0.667, blue: 1.000)
-            case .workbuddy:        return Color(red: 0.000, green: 0.322, blue: 0.851)
-            case .workbuddyActive:  return Color(red: 0.235, green: 0.510, blue: 0.965)
             case .hermes:           return Color(red: 0.953, green: 0.722, blue: 0.196)
             case .hermesActive:     return Color(red: 1.000, green: 0.831, blue: 0.353)
             case .error:            return Color(red: 0.90, green: 0.35, blue: 0.30)
@@ -120,13 +108,9 @@ struct PixelMascot: View {
             case .kimiMoon:    drawShape(context, canvasSize, 52, drawKimiMoon)
             case .openCodeMark: drawShape(context, canvasSize, 50, drawOpenCodeMark)
             case .clineBot:    drawShape(context, canvasSize, 48, drawClineBot)
-            case .traeRocket:  drawShape(context, canvasSize, 44, drawTraeRocket)
-            case .traeBolt:    drawShape(context, canvasSize, 52, drawTraeBolt)
             case .kiroGhost:   drawShape(context, canvasSize, 48, drawKiroGhost)
             case .piGlyph:     drawShape(context, canvasSize, 48, drawPiGlyph)
-            case .stepfunStairs: drawShape(context, canvasSize, 50, drawStepfunStairs)
             case .antigravityOrbit: drawShape(context, canvasSize, 52, drawAntigravityOrbit)
-            case .workbuddyPal: drawShape(context, canvasSize, 50, drawWorkbuddyPal)
             case .hermesWing:  drawShape(context, canvasSize, 58, drawHermesWing)
             }
         }
@@ -151,13 +135,9 @@ struct PixelMascot: View {
         case .kimiMoon:    return size                  // 52/52
         case .openCodeMark: return size * (50.0 / 52.0)
         case .clineBot:    return size * (48.0 / 52.0)
-        case .traeRocket:  return size * (44.0 / 52.0)
-        case .traeBolt:    return size
         case .kiroGhost:   return size * (48.0 / 52.0)
         case .piGlyph:     return size * (48.0 / 52.0)
-        case .stepfunStairs: return size * (50.0 / 52.0)
         case .antigravityOrbit: return size
-        case .workbuddyPal: return size * (50.0 / 52.0)
         case .hermesWing:  return size * (58.0 / 52.0)
         }
     }
@@ -514,43 +494,6 @@ struct PixelMascot: View {
         fill(CGRect(x: 26, y: 44, width: 8,  height: 7),  dark)
     }
 
-    // MARK: - Trae (rocket)
-    private func drawTraeRocket(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
-        let body = palette.body
-        let nose = Color(red: 1.00, green: 0.62, blue: 0.45)
-        let window = Color(red: 0.95, green: 0.97, blue: 1.00)
-        let fin = Color(red: 0.74, green: 0.18, blue: 0.16)
-        let flame = Color(red: 1.00, green: 0.78, blue: 0.25)
-        fill(CGRect(x: 18, y: 0,  width: 8,  height: 4),  nose)
-        fill(CGRect(x: 15, y: 4,  width: 14, height: 5),  body)
-        fill(CGRect(x: 12, y: 9,  width: 20, height: 26), body)
-        fill(CGRect(x: 15, y: 4,  width: 6,  height: 3),  nose)
-        fill(CGRect(x: 17, y: 14, width: 10, height: 10), window)
-        fill(CGRect(x: 19, y: 16, width: 5,  height: 6),  palette.eyes)
-        fill(CGRect(x: 20, y: 17, width: 2,  height: 2),  window)
-        fill(CGRect(x: 6,  y: 27, width: 7,  height: 12), fin)
-        fill(CGRect(x: 31, y: 27, width: 7,  height: 12), fin)
-        fill(CGRect(x: 12, y: 35, width: 20, height: 5),  body)
-        fill(CGRect(x: 16, y: 40, width: 12, height: 5),  flame)
-        fill(CGRect(x: 18, y: 45, width: 8,  height: 4),  nose)
-        fill(CGRect(x: 20, y: 49, width: 4,  height: 3),  flame)
-    }
-
-    // MARK: - TraeCli (terminal box)
-    private func drawTraeBolt(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
-        let body = palette.body
-        let screen = Color(red: 0.16, green: 0.05, blue: 0.05)
-        let prompt = Color(red: 1.00, green: 0.85, blue: 0.55)
-        fill(CGRect(x: 4,  y: 4,  width: 44, height: 34), body)
-        fill(CGRect(x: 8,  y: 9,  width: 36, height: 24), screen)
-        fill(CGRect(x: 13, y: 14, width: 4,  height: 4),  prompt)
-        fill(CGRect(x: 17, y: 18, width: 4,  height: 4),  prompt)
-        fill(CGRect(x: 13, y: 22, width: 4,  height: 4),  prompt)
-        fill(CGRect(x: 26, y: 24, width: 12, height: 4),  prompt)
-        fill(CGRect(x: 12, y: 38, width: 9,  height: 9),  body)
-        fill(CGRect(x: 31, y: 38, width: 9,  height: 9),  body)
-    }
-
     // MARK: - Kiro (ghost)
     private func drawKiroGhost(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
         let body = palette.body
@@ -587,27 +530,6 @@ struct PixelMascot: View {
         fill(CGRect(x: 28, y: 44, width: 11, height: 6),  body)
     }
 
-    // MARK: - StepFun (staircase to a star)
-    private func drawStepfunStairs(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
-        let body = palette.body
-        let edge = Color(red: 0.45, green: 0.52, blue: 1.00)
-        let star = Color(red: 1.00, green: 0.90, blue: 0.40)
-        let face = Color(red: 0.90, green: 0.94, blue: 1.00)
-        fill(CGRect(x: 38, y: 0,  width: 4,  height: 10), star)
-        fill(CGRect(x: 34, y: 3,  width: 12, height: 4),  star)
-        fill(CGRect(x: 36, y: 2,  width: 8,  height: 6),  star)
-        fill(CGRect(x: 2,  y: 34, width: 16, height: 14), body)
-        fill(CGRect(x: 16, y: 24, width: 16, height: 24), body)
-        fill(CGRect(x: 30, y: 14, width: 16, height: 34), body)
-        fill(CGRect(x: 2,  y: 34, width: 16, height: 3),  edge)
-        fill(CGRect(x: 16, y: 24, width: 16, height: 3),  edge)
-        fill(CGRect(x: 30, y: 14, width: 16, height: 3),  edge)
-        fill(CGRect(x: 33, y: 21, width: 5,  height: 7),  face)
-        fill(CGRect(x: 40, y: 21, width: 5,  height: 7),  face)
-        fill(CGRect(x: 34, y: 23, width: 3,  height: 4),  palette.eyes)
-        fill(CGRect(x: 41, y: 23, width: 3,  height: 4),  palette.eyes)
-    }
-
     // MARK: - AntiGravity (floating planet + orbit)
     private func drawAntigravityOrbit(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
         let body = palette.body
@@ -635,35 +557,6 @@ struct PixelMascot: View {
         fill(CGRect(x: 31, y: 24, width: 3,  height: 4),  palette.eyes)
         fill(CGRect(x: 46, y: 4,  width: 2,  height: 6),  spark)
         fill(CGRect(x: 44, y: 6,  width: 6,  height: 2),  spark)
-    }
-
-    // MARK: - WorkBuddy (headset buddy)
-    private func drawWorkbuddyPal(_ context: GraphicsContext, _ fill: (CGRect, Color) -> Void) {
-        let body = palette.body
-        let edge = Color(red: 0.35, green: 0.60, blue: 1.00)
-        let cans = Color(red: 0.20, green: 0.24, blue: 0.32)
-        let mic = Color(red: 0.85, green: 0.88, blue: 0.95)
-        let mouth = Color(red: 0.85, green: 0.88, blue: 0.95)
-        fill(CGRect(x: 24, y: 0,  width: 3,  height: 5),  edge)
-        fill(CGRect(x: 22, y: 0,  width: 7,  height: 3),  mic)
-        fill(CGRect(x: 8,  y: 6,  width: 34, height: 4),  cans)
-        fill(CGRect(x: 14, y: 6,  width: 22, height: 4),  body)
-        fill(CGRect(x: 9,  y: 10, width: 32, height: 30), body)
-        fill(CGRect(x: 14, y: 40, width: 22, height: 4),  body)
-        fill(CGRect(x: 14, y: 10, width: 22, height: 2),  edge)
-        fill(CGRect(x: 4,  y: 16, width: 7,  height: 12), cans)
-        fill(CGRect(x: 39, y: 16, width: 7,  height: 12), cans)
-        fill(CGRect(x: 8,  y: 28, width: 3,  height: 6),  cans)
-        fill(CGRect(x: 11, y: 32, width: 6,  height: 3),  mic)
-        fill(CGRect(x: 16, y: 18, width: 6,  height: 7),  mic)
-        fill(CGRect(x: 28, y: 18, width: 6,  height: 7),  mic)
-        fill(CGRect(x: 17, y: 19, width: 4,  height: 5),  palette.eyes)
-        fill(CGRect(x: 29, y: 19, width: 4,  height: 5),  palette.eyes)
-        fill(CGRect(x: 19, y: 30, width: 12, height: 3),  mouth)
-        fill(CGRect(x: 18, y: 28, width: 3,  height: 3),  mouth)
-        fill(CGRect(x: 29, y: 28, width: 3,  height: 3),  mouth)
-        fill(CGRect(x: 16, y: 44, width: 7,  height: 6),  body)
-        fill(CGRect(x: 27, y: 44, width: 7,  height: 6),  body)
     }
 
     // MARK: - Hermes (winged helmet)

@@ -20,9 +20,10 @@ enum ProviderInstaller {
         case toml         // Kimi: [[hooks]] array-of-tables appended to config.toml
         case opencodePlugin // OpenCode: JS plugin file + register in opencode.json
         case clineScripts // Cline: one executable bash script per event in a dir
-        case traecliYAML  // TraeCli: a marker-delimited YAML command-hook block
         case kiroAgent    // Kiro: agent-scoped JSON ({command,matcher,timeout_ms}); needs `kiro --agent codeisland`
         case piExtension  // Pi / Oh My Pi: a TypeScript extension auto-discovered from the agent's extensions dir
+        case hermesYAML   // Nous Hermes: merge a `hooks:` map into ~/.hermes/config.yaml (needs `hermes hooks` approval)
+        case antigravityJSON // Google Antigravity: a named hook group in ~/.gemini/config/hooks.json
     }
 
     enum TimeoutUnit { case seconds, milliseconds }
@@ -138,28 +139,6 @@ enum ProviderInstaller {
                    detectPaths: ["Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
                                  "Documents/Cline"]),
 
-        // Trae (ByteDance) — flat format + Cursor's event vocabulary.
-        Descriptor(source: "trae", displayName: "Trae",
-                   configDirRel: ".trae", configFileRel: "hooks.json",
-                   format: .flat, timeoutUnit: .seconds, createDirIfMissing: false,
-                   events: [("beforeSubmitPrompt", 5), ("beforeShellExecution", 300),
-                            ("afterShellExecution", 5), ("beforeReadFile", 5), ("afterFileEdit", 5),
-                            ("beforeMCPExecution", 300), ("afterMCPExecution", 5),
-                            ("afterAgentThought", 5), ("afterAgentResponse", 5), ("stop", 5)]),
-
-        // TraeCli — YAML (one combined command-hook, all events as matchers, timeout as "<n>s").
-        Descriptor(source: "traecli", displayName: "TraeCli",
-                   configDirRel: ".trae", configFileRel: "traecli.yaml",
-                   format: .traecliYAML, timeoutUnit: .seconds, createDirIfMissing: false,
-                   // No permission_request: TraeCli isn't a Claude fork, so its
-                   // permission response shape is unverified — subscribing a
-                   // blocking hook risks a no-op/hang. Let it prompt natively.
-                   events: [("session_start", 5), ("session_end", 5), ("user_prompt_submit", 5),
-                            ("pre_tool_use", 5), ("post_tool_use", 5), ("post_tool_use_failure", 5),
-                            ("notification", 86400),
-                            ("subagent_start", 5), ("subagent_stop", 5), ("stop", 5),
-                            ("pre_compact", 5), ("post_compact", 5)]),
-
         // Kiro — agent-scoped JSON; fires only when launched as `kiro --agent codeisland`.
         // Detected on ~/.kiro; hooks land in the auto-created agents/ subdir.
         Descriptor(source: "kiro", displayName: "Kiro",
@@ -179,23 +158,23 @@ enum ProviderInstaller {
                    format: .piExtension, timeoutUnit: .seconds, createDirIfMissing: false,
                    events: [], detectPaths: [".omp/agent"]),
 
-        // Claude-Code forks — same as Qoder/Factory/CodeBuddy (claudeFork, seconds).
-        Descriptor(source: "stepfun", displayName: "StepFun",
-                   configDirRel: ".stepfun", configFileRel: "settings.json",
-                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
-                   events: standardEvents),
+        // AntiGravity = Google's Gemini IDE/CLI (NOT a Claude fork — name collision
+        // in the reference). Global hooks live in ~/.gemini/config/hooks.json
+        // (shared with Gemini CLI's dir, but a different file). Detected via the
+        // ~/.gemini/antigravity dir so Gemini-CLI-only users aren't touched.
         Descriptor(source: "antigravity", displayName: "AntiGravity",
-                   configDirRel: ".antigravity", configFileRel: "settings.json",
-                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
-                   events: standardEvents),
-        Descriptor(source: "workbuddy", displayName: "WorkBuddy",
-                   configDirRel: ".workbuddy", configFileRel: "settings.json",
-                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
-                   events: standardEvents),
+                   configDirRel: ".gemini/config", configFileRel: "hooks.json",
+                   format: .antigravityJSON, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: [], detectPaths: [".gemini/antigravity"]),
+        // Hermes = Nous Research's hermes-agent (NOT the reference's "Claude fork"
+        // — name collision). Hooks live in ~/.hermes/config.yaml's `hooks:` map,
+        // payload via stdin JSON, and must be approved once via `hermes hooks`
+        // (or hooks_auto_accept). No clean turn-end event → session + tool only.
         Descriptor(source: "hermes", displayName: "Hermes",
-                   configDirRel: ".hermes", configFileRel: "settings.json",
-                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
-                   events: standardEvents),
+                   configDirRel: ".hermes", configFileRel: "config.yaml",
+                   format: .hermesYAML, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: [("on_session_start", 5), ("on_session_end", 5),
+                            ("pre_tool_call", 5), ("post_tool_call", 5), ("subagent_stop", 5)]),
     ]
 
     // MARK: - Entry point
@@ -245,8 +224,9 @@ enum ProviderInstaller {
         case .toml:           return installKimiTOML(d)
         case .opencodePlugin: return installOpenCodePlugin(d)
         case .clineScripts:   return installClineScripts(d)
-        case .traecliYAML:    return installTraecliYAML(d)
         case .piExtension:    return installPiExtension(d)
+        case .hermesYAML:     return installHermesYAML(d)
+        case .antigravityJSON: return installAntigravityJSON(d)
         case .claudeFork, .nested, .flat, .copilot, .kiroAgent:
             break  // JSON-file path below (kiroAgent reuses the merge writer)
         }
@@ -599,41 +579,80 @@ enum ProviderInstaller {
         return allOK
     }
 
-    // MARK: - TraeCli (YAML)
+    // MARK: - Hermes (Nous Research — config.yaml `hooks:` map)
 
-    private static let traeBegin = "# >>> code-island traecli hook (auto-generated) >>>"
-    private static let traeEnd   = "# <<< code-island traecli hook <<<"
+    private static let hermesMarker = "# code-island-managed"
 
-    /// One combined `- type: command` list item under a top-level `hooks:` key,
-    /// carrying every event as a `matchers` entry; timeout is a string ("<n>s").
-    /// Marker-delimited so foreign YAML is preserved (same idea as installKimiTOML).
-    private static func installTraecliYAML(_ d: Descriptor) -> Bool {
-        let dir = configDir(d)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let fileURL = dir.appendingPathComponent(d.configFileRel)
+    /// Replaces the `hooks:` map in ~/.hermes/config.yaml with our entries.
+    /// SAFE: only touches the top-level `hooks:` block, and only if it's empty
+    /// (`hooks: {}`) or already ours — bails on user-authored hooks. Backs up
+    /// to .bak. Hermes still requires the user to approve via `hermes hooks`
+    /// (or set `hooks_auto_accept`) before the hooks fire.
+    private static func installHermesYAML(_ d: Descriptor) -> Bool {
+        let fileURL = configDir(d).appendingPathComponent(d.configFileRel)   // ~/.hermes/config.yaml
+        guard let existing = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            Log.info("ProviderInstaller(hermes): no config.yaml — skipping (Hermes not set up)")
+            return true
+        }
         let cmd = launcherCommand(d.source)
-        let timeout = d.events.map(\.timeout).max() ?? 5
-        var lines = [traeBegin, "hooks:", "  - type: command",
-                     "    command: '\(cmd.replacingOccurrences(of: "'", with: "''"))'",
-                     "    timeout: '\(timeout)s'", "    matchers:"]
-        for (event, _) in d.events { lines.append("      - event: \(event)") }
-        lines.append(traeEnd)
-        let ourBlock = lines.joined(separator: "\n")
+        var block = ["hooks:", "  \(hermesMarker) — regenerated by Code Island"]
+        for (event, secs) in d.events {
+            block.append("  \(event):")
+            block.append("    - command: '\(cmd.replacingOccurrences(of: "'", with: "''"))'")
+            block.append("      timeout: \(secs)")
+        }
+        let ourBlock = block.joined(separator: "\n")
 
-        let existing = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
-        var body = existing
-        if let s = body.range(of: traeBegin), let e = body.range(of: traeEnd) {
-            body.removeSubrange(s.lowerBound..<e.upperBound)
+        var lines = existing.components(separatedBy: "\n")
+        guard let start = lines.firstIndex(where: { $0.hasPrefix("hooks:") }) else {
+            Log.error("ProviderInstaller(hermes): no top-level `hooks:` key — refusing to add")
+            return false
         }
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newText = trimmed.isEmpty ? ourBlock + "\n" : trimmed + "\n\n" + ourBlock + "\n"
+        // Extent of the current hooks block: the key line + following indented lines.
+        var end = start + 1
+        while end < lines.count, lines[end].hasPrefix(" ") || lines[end].hasPrefix("\t") { end += 1 }
+        let current = lines[start..<end].joined(separator: "\n")
+        let isEmpty = lines[start].trimmingCharacters(in: .whitespaces) == "hooks: {}"
+            || (end == start + 1 && lines[start].trimmingCharacters(in: .whitespaces) == "hooks:")
+        guard isEmpty || current.contains(hermesMarker) else {
+            Log.error("ProviderInstaller(hermes): config.yaml `hooks:` has user content — not overwriting")
+            return false
+        }
+        lines.replaceSubrange(start..<end, with: [ourBlock])
+        let newText = lines.joined(separator: "\n")
         if newText == existing { return true }
-        if !existing.isEmpty {
-            try? existing.write(to: fileURL.appendingPathExtension("bak"), atomically: true, encoding: .utf8)
-        }
+        try? existing.write(to: fileURL.appendingPathExtension("bak"), atomically: true, encoding: .utf8)
         do { try newText.write(to: fileURL, atomically: true, encoding: .utf8)
-             print("[CodeIsland] TraeCli hooks installed at \(fileURL.path)"); return true }
-        catch { Log.error("ProviderInstaller(traecli): write failed: \(error)"); return false }
+             print("[CodeIsland] Hermes hooks written to \(fileURL.path) (approve via `hermes hooks`)"); return true }
+        catch { Log.error("ProviderInstaller(hermes): write failed: \(error)"); return false }
+    }
+
+    // MARK: - AntiGravity (Google — ~/.gemini/config/hooks.json named group)
+
+    /// Writes a "code-island" hook group into ~/.gemini/config/hooks.json.
+    /// Tool events use `{matcher, hooks:[…]}`; invocation/stop events use bare
+    /// `{type,command}`. Event name is passed via `--event` (the payload has no
+    /// event-name field). NOTE: Antigravity caches hooks at daemon startup, so
+    /// a running session must be restarted to pick these up.
+    private static func installAntigravityJSON(_ d: Descriptor) -> Bool {
+        let fileURL = configDir(d).appendingPathComponent(d.configFileRel)   // ~/.gemini/config/hooks.json
+        try? FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let cmd = launcherCommand(d.source)
+        func handler(_ event: String) -> [String: Any] {
+            ["type": "command", "command": "\(cmd) --event \(event)", "timeout": 10]
+        }
+        let ok = mergeJSONObject(at: fileURL) { root in
+            root["code-island"] = [
+                "enabled": true,
+                "PreInvocation": [handler("PreInvocation")],
+                "Stop": [handler("Stop")],
+                "PreToolUse":  [["matcher": "*", "hooks": [handler("PreToolUse")]]],
+                "PostToolUse": [["matcher": "*", "hooks": [handler("PostToolUse")]]],
+            ]
+        }
+        print("[CodeIsland] AntiGravity hooks \(ok ? "installed" : "FAILED") in \(fileURL.path) (restart AntiGravity to load)")
+        return ok
     }
 
     // MARK: - Kiro (agent-scoped JSON)
@@ -645,15 +664,19 @@ enum ProviderInstaller {
         return mergeJSONObject(at: url) { root in
             if root["name"] == nil { root["name"] = "codeisland" }
             if root["description"] == nil {
-                root["description"] = "Auto-generated by Code Island — relays Kiro hook events to the macOS notch. Launch with `kiro --agent codeisland`."
+                root["description"] = "Auto-generated by Code Island — relays Kiro hook events to the macOS notch. Launch with `kiro-cli --agent codeisland`."
             }
+            // `matcher` is only valid for the tool events (it matches tool names);
+            // adding it to agentSpawn/userPromptSubmit/stop is ignored at best.
+            let toolEvents: Set<String> = ["preToolUse", "postToolUse"]
             var hooks = root["hooks"] as? [String: Any] ?? [:]
             for (event, secs) in d.events {
                 var entries = (hooks[event] as? [[String: Any]] ?? []).filter {
                     !(($0["command"] as? String)?.contains(marker) ?? false)
                 }
-                entries.append(["command": cmd, "matcher": "*",
-                                "timeout_ms": timeoutValue(secs, .milliseconds)])
+                var entry: [String: Any] = ["command": cmd, "timeout_ms": timeoutValue(secs, .milliseconds)]
+                if toolEvents.contains(event) { entry["matcher"] = "*" }
+                entries.append(entry)
                 hooks[event] = entries
             }
             root["hooks"] = hooks

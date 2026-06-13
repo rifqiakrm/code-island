@@ -85,25 +85,6 @@ let eventNormalization: [String: [String: String]] = [
         "TaskStart": "SessionStart", "TaskResume": "UserPromptSubmit",
         "TaskComplete": "Stop", "TaskCancel": "Stop",
     ],
-    // Trae (ByteDance) — identical flat vocabulary to Cursor.
-    "trae": [
-        "beforeSubmitPrompt": "UserPromptSubmit",
-        "beforeShellExecution": "PreToolUse", "afterShellExecution": "PostToolUse",
-        "beforeReadFile": "PreToolUse", "afterFileEdit": "PostToolUse",
-        "beforeMCPExecution": "PreToolUse", "afterMCPExecution": "PostToolUse",
-        "afterAgentThought": "Notification", "afterAgentResponse": "Stop", "stop": "skip",
-    ],
-    // TraeCli — snake_case event vocabulary.
-    "traecli": [
-        "session_start": "SessionStart", "session_end": "SessionEnd",
-        "user_prompt_submit": "UserPromptSubmit",
-        "pre_tool_use": "PreToolUse", "post_tool_use": "PostToolUse",
-        "post_tool_use_failure": "skip",
-        "permission_request": "skip",  // not subscribed; native handling (see installer)
-        "notification": "Notification",
-        "subagent_start": "SubagentStart", "subagent_stop": "SubagentStop",
-        "stop": "Stop", "pre_compact": "PreCompact", "post_compact": "skip",
-    ],
     // Kiro — camelCase; no SessionEnd (process sweep handles teardown).
     "kiro": [
         "agentSpawn": "SessionStart", "userPromptSubmit": "UserPromptSubmit",
@@ -112,8 +93,22 @@ let eventNormalization: [String: [String: String]] = [
     // Pi / Oh My Pi extensions emit canonical names already; just drop PostCompact.
     "pi":  ["PostCompact": "skip"],
     "omp": ["PostCompact": "skip"],
+    // Nous Research Hermes (config.yaml hooks). on_session_start/on_session_end
+    // bracket each TURN (not the CLI lifetime), so map them to the turn cycle —
+    // start→UserPromptSubmit (thinking), end→Stop (finished, card STAYS). Using
+    // SessionEnd here would delete the card after every prompt. Real CLI exit is
+    // handled by the PID sweep (Hermes' hook parent is the long-lived process).
+    "hermes": [
+        "on_session_start": "UserPromptSubmit", "on_session_end": "Stop",
+        "pre_tool_call": "PreToolUse", "post_tool_call": "PostToolUse",
+        "subagent_stop": "SubagentStop",
+    ],
+    // Google AntiGravity (~/.gemini/config/hooks.json). PreInvocation = turn
+    // start; PreToolUse/PostToolUse/Stop are already canonical (passthrough).
+    "antigravity": [
+        "PreInvocation": "UserPromptSubmit", "PostInvocation": "skip",
+    ],
     // kimi & opencode emit canonical names already → identity (not listed).
-    // Claude forks (stepfun/antigravity/workbuddy/hermes) → identity.
 ]
 // Strict-approval gate. Gemini/Cursor/Copilot/Kimi don't have a selective
 // permission event — only blanket "before every tool" hooks. When the user
@@ -123,9 +118,9 @@ let eventNormalization: [String: [String: String]] = [
 let permissionGateEvents: [String: Set<String>] = [
     "gemini": ["BeforeTool"],
     "cursor": ["beforeShellExecution", "beforeMCPExecution"],
-    "trae": ["beforeShellExecution", "beforeMCPExecution"],
     "copilot": ["preToolUse"],
     "kimi": ["PreToolUse"],
+    "antigravity": ["PreToolUse"],
 ]
 func strictApprovalEnabled(_ source: String) -> Bool {
     let url = FileManager.default.homeDirectoryForCurrentUser
@@ -149,8 +144,15 @@ if hookEvent == "skip" { exit(0) }
 // card on every event.
 let sessionId = (payload["session_id"] as? String)
     ?? (payload["sessionId"] as? String)
+    ?? (payload["conversationId"] as? String)        // AntiGravity
     ?? "\(providerSource)-\(getppid())"
-let cwd = payload["cwd"] as? String
+// AntiGravity's tool payload: { toolCall: { name, args: { CommandLine, Cwd } },
+// workspacePaths: [...] } — no top-level cwd/tool_name/tool_input.
+let agToolCall = payload["toolCall"] as? [String: Any]
+let agArgs = agToolCall?["args"] as? [String: Any]
+let cwd = (payload["cwd"] as? String)
+    ?? (agArgs?["Cwd"] as? String)
+    ?? (payload["workspacePaths"] as? [String])?.first
 
 // Extract tool name (Copilot uses camelCase "toolName"). For Cursor's strict
 // gate, shell/MCP events carry no tool_name — synthesize a readable label.
@@ -162,6 +164,7 @@ func strictGateLabel(_ event: String) -> String? {
     }
 }
 let toolName = payload["tool_name"] as? String ?? payload["toolName"] as? String
+    ?? (agToolCall?["name"] as? String)              // AntiGravity
     ?? (isStrictGate ? strictGateLabel(rawEvent) : nil)
 
 // Extract tool input as a string summary, plus separate content/path for Write/Edit
@@ -215,6 +218,10 @@ if let toolInput = normalizedToolInput {
 if toolInputStr == nil, let topCommand = payload["command"] as? String {
     toolInputStr = topCommand
 }
+// AntiGravity's shell tool: toolCall.args.CommandLine.
+if toolInputStr == nil, let cl = agArgs?["CommandLine"] as? String {
+    toolInputStr = cl
+}
 
 // Collect terminal env vars for jump support
 var envVars: [String: String] = [:]
@@ -263,8 +270,15 @@ func getParentPid(_ pid: pid_t) -> pid_t {
 }
 
 // Extract user/assistant messages directly from Claude Code's payload
+// AntiGravity puts both prompt and reply only in its transcript.jsonl.
+let agTranscriptPath = payload["transcriptPath"] as? String ?? payload["transcript_path"] as? String
+
 let userMessage: String? = {
     if hookEvent == "UserPromptSubmit" {
+        // AntiGravity carries no prompt field — read it from the transcript.
+        if providerSource == "antigravity", let p = agTranscriptPath {
+            return agUserRequestFromTranscript(p)
+        }
         // Claude uses "prompt"; Cursor/others vary.
         return payload["prompt"] as? String ?? payload["query"] as? String
             ?? payload["user_prompt"] as? String ?? payload["message"] as? String
@@ -275,8 +289,14 @@ let userMessage: String? = {
 
 let assistantMessage: String? = {
     if hookEvent == "Stop" {
-        // Cursor's afterAgentResponse carries the reply in "text"/"message".
+        // AntiGravity carries no reply field — read it from the transcript.
+        if providerSource == "antigravity", let p = agTranscriptPath {
+            return agAssistantFromTranscript(p)
+        }
+        // Cursor's afterAgentResponse carries the reply in "text"/"message";
+        // Gemini's AfterAgent uses "prompt_response".
         return payload["last_assistant_message"] as? String
+            ?? payload["prompt_response"] as? String
             ?? payload["text"] as? String ?? payload["message"] as? String
     }
     return nil
@@ -324,6 +344,43 @@ func lastAssistantFromTranscript(_ path: String) -> String? {
         if !texts.isEmpty {
             return String(texts.joined(separator: "\n").prefix(500))
         }
+    }
+    return nil
+}
+
+// AntiGravity's hook payloads carry no prompt/reply text — only a transcript
+// path. Its transcript.jsonl uses {type, source, content} lines: USER_INPUT
+// (wrapped in <USER_REQUEST>…</USER_REQUEST>) for the prompt, PLANNER_RESPONSE
+// from MODEL with a `content` string for the assistant's reply.
+func agUserRequestFromTranscript(_ path: String) -> String? {
+    guard let data = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+    for line in data.components(separatedBy: "\n").reversed() {
+        guard !line.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+              json["type"] as? String == "USER_INPUT",
+              var content = json["content"] as? String else { continue }
+        // Strip the <USER_REQUEST>…</USER_REQUEST> wrapper and any trailing
+        // <ADDITIONAL_METADATA>… block AntiGravity appends.
+        if let r = content.range(of: "<USER_REQUEST>"),
+           let e = content.range(of: "</USER_REQUEST>") {
+            content = String(content[r.upperBound..<e.lowerBound])
+        }
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return String(trimmed.prefix(500)) }
+    }
+    return nil
+}
+
+func agAssistantFromTranscript(_ path: String) -> String? {
+    guard let data = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+    for line in data.components(separatedBy: "\n").reversed() {
+        guard !line.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+              json["type"] as? String == "PLANNER_RESPONSE",
+              json["source"] as? String == "MODEL",
+              let content = json["content"] as? String else { continue }
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return String(trimmed.prefix(500)) }
     }
     return nil
 }
@@ -504,10 +561,14 @@ func translateStrictDecision(source: String, appResponse: Data) -> Data {
     case "gemini":
         // Gemini has no "ask" — treat it as allow.
         json = deny ? "{\"decision\":\"deny\",\"reason\":\"\(reason)\"}" : "{\"decision\":\"allow\"}"
-    case "cursor", "trae":
+    case "cursor":
         if deny { json = "{\"permission\":\"deny\",\"agent_message\":\"\(reason)\"}" }
         else if ask { json = "{\"permission\":\"ask\"}" }
         else { json = "{\"permission\":\"allow\"}" }
+    case "antigravity":
+        if deny { json = "{\"decision\":\"deny\",\"reason\":\"\(reason)\"}" }
+        else if ask { json = "{\"decision\":\"ask\"}" }
+        else { json = "{\"decision\":\"allow\"}" }
     case "copilot":
         if deny { json = "{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"\(reason)\"}" }
         else if ask { json = "{\"permissionDecision\":\"ask\"}" }
