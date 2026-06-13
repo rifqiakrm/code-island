@@ -135,6 +135,9 @@ PRs welcome! Areas that could use work:
 
 For commercial licensing, please contact the copyright holder.
 
-## Credits
+## Acknowledgements
 
-Inspired by [Vibe Island](https://vibeisland.app). Claude mascot adapted from the [Claude Code Mascot Generator](https://claude-code-mascot-generator.replit.app/).
+- [Vibe Island](https://vibeisland.app) — the original inspiration for a notch-based agent dashboard
+- [Vibe Notch](https://github.com/farouqaldori/vibe-notch) by [@farouqaldori](https://github.com/farouqaldori) — the notch mascot is taken directly from this project
+
+Code Island is an independent project and is not affiliated with or endorsed by any of the above.
