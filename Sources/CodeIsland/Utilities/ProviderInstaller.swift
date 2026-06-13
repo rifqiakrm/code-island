@@ -20,6 +20,9 @@ enum ProviderInstaller {
         case toml         // Kimi: [[hooks]] array-of-tables appended to config.toml
         case opencodePlugin // OpenCode: JS plugin file + register in opencode.json
         case clineScripts // Cline: one executable bash script per event in a dir
+        case traecliYAML  // TraeCli: a marker-delimited YAML command-hook block
+        case kiroAgent    // Kiro: agent-scoped JSON ({command,matcher,timeout_ms}); needs `kiro --agent codeisland`
+        case piExtension  // Pi / Oh My Pi: a TypeScript extension auto-discovered from the agent's extensions dir
     }
 
     enum TimeoutUnit { case seconds, milliseconds }
@@ -134,6 +137,65 @@ enum ProviderInstaller {
                             ("TaskComplete", 5), ("PreCompact", 5)],
                    detectPaths: ["Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
                                  "Documents/Cline"]),
+
+        // Trae (ByteDance) — flat format + Cursor's event vocabulary.
+        Descriptor(source: "trae", displayName: "Trae",
+                   configDirRel: ".trae", configFileRel: "hooks.json",
+                   format: .flat, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: [("beforeSubmitPrompt", 5), ("beforeShellExecution", 300),
+                            ("afterShellExecution", 5), ("beforeReadFile", 5), ("afterFileEdit", 5),
+                            ("beforeMCPExecution", 300), ("afterMCPExecution", 5),
+                            ("afterAgentThought", 5), ("afterAgentResponse", 5), ("stop", 5)]),
+
+        // TraeCli — YAML (one combined command-hook, all events as matchers, timeout as "<n>s").
+        Descriptor(source: "traecli", displayName: "TraeCli",
+                   configDirRel: ".trae", configFileRel: "traecli.yaml",
+                   format: .traecliYAML, timeoutUnit: .seconds, createDirIfMissing: false,
+                   // No permission_request: TraeCli isn't a Claude fork, so its
+                   // permission response shape is unverified — subscribing a
+                   // blocking hook risks a no-op/hang. Let it prompt natively.
+                   events: [("session_start", 5), ("session_end", 5), ("user_prompt_submit", 5),
+                            ("pre_tool_use", 5), ("post_tool_use", 5), ("post_tool_use_failure", 5),
+                            ("notification", 86400),
+                            ("subagent_start", 5), ("subagent_stop", 5), ("stop", 5),
+                            ("pre_compact", 5), ("post_compact", 5)]),
+
+        // Kiro — agent-scoped JSON; fires only when launched as `kiro --agent codeisland`.
+        // Detected on ~/.kiro; hooks land in the auto-created agents/ subdir.
+        Descriptor(source: "kiro", displayName: "Kiro",
+                   configDirRel: ".kiro/agents", configFileRel: "codeisland.json",
+                   format: .kiroAgent, timeoutUnit: .milliseconds, createDirIfMissing: false,
+                   events: [("agentSpawn", 5), ("userPromptSubmit", 5),
+                            ("preToolUse", 5), ("postToolUse", 5), ("stop", 5)],
+                   detectPaths: [".kiro"]),
+
+        // Pi + Oh My Pi — TypeScript extension auto-discovered from the agent's extensions dir.
+        Descriptor(source: "pi", displayName: "Pi",
+                   configDirRel: ".pi/agent/extensions", configFileRel: "codeisland.ts",
+                   format: .piExtension, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: [], detectPaths: [".pi/agent"]),
+        Descriptor(source: "omp", displayName: "Oh My Pi",
+                   configDirRel: ".omp/agent/extensions", configFileRel: "codeisland.ts",
+                   format: .piExtension, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: [], detectPaths: [".omp/agent"]),
+
+        // Claude-Code forks — same as Qoder/Factory/CodeBuddy (claudeFork, seconds).
+        Descriptor(source: "stepfun", displayName: "StepFun",
+                   configDirRel: ".stepfun", configFileRel: "settings.json",
+                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: standardEvents),
+        Descriptor(source: "antigravity", displayName: "AntiGravity",
+                   configDirRel: ".antigravity", configFileRel: "settings.json",
+                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: standardEvents),
+        Descriptor(source: "workbuddy", displayName: "WorkBuddy",
+                   configDirRel: ".workbuddy", configFileRel: "settings.json",
+                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: standardEvents),
+        Descriptor(source: "hermes", displayName: "Hermes",
+                   configDirRel: ".hermes", configFileRel: "settings.json",
+                   format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
+                   events: standardEvents),
     ]
 
     // MARK: - Entry point
@@ -183,8 +245,10 @@ enum ProviderInstaller {
         case .toml:           return installKimiTOML(d)
         case .opencodePlugin: return installOpenCodePlugin(d)
         case .clineScripts:   return installClineScripts(d)
-        case .claudeFork, .nested, .flat, .copilot:
-            break
+        case .traecliYAML:    return installTraecliYAML(d)
+        case .piExtension:    return installPiExtension(d)
+        case .claudeFork, .nested, .flat, .copilot, .kiroAgent:
+            break  // JSON-file path below (kiroAgent reuses the merge writer)
         }
 
         let fileURL = configDir(d).appendingPathComponent(d.configFileRel)
@@ -201,6 +265,7 @@ enum ProviderInstaller {
         case .claudeFork, .nested: ok = writeJSONHooks(d, at: fileURL)
         case .flat:                ok = writeFlatHooks(d, at: fileURL)
         case .copilot:             ok = writeCopilotHooks(d, at: fileURL)
+        case .kiroAgent:           ok = writeKiroAgent(d, at: fileURL)
         default:                   ok = false  // handled above
         }
         print("[CodeIsland] \(d.displayName) hooks \(ok ? "installed" : "FAILED") at \(fileURL.path)")
@@ -532,6 +597,182 @@ enum ProviderInstaller {
         }
         print("[CodeIsland] Cline hooks \(allOK ? "installed" : "FAILED") at \(hooksDir.path)")
         return allOK
+    }
+
+    // MARK: - TraeCli (YAML)
+
+    private static let traeBegin = "# >>> code-island traecli hook (auto-generated) >>>"
+    private static let traeEnd   = "# <<< code-island traecli hook <<<"
+
+    /// One combined `- type: command` list item under a top-level `hooks:` key,
+    /// carrying every event as a `matchers` entry; timeout is a string ("<n>s").
+    /// Marker-delimited so foreign YAML is preserved (same idea as installKimiTOML).
+    private static func installTraecliYAML(_ d: Descriptor) -> Bool {
+        let dir = configDir(d)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fileURL = dir.appendingPathComponent(d.configFileRel)
+        let cmd = launcherCommand(d.source)
+        let timeout = d.events.map(\.timeout).max() ?? 5
+        var lines = [traeBegin, "hooks:", "  - type: command",
+                     "    command: '\(cmd.replacingOccurrences(of: "'", with: "''"))'",
+                     "    timeout: '\(timeout)s'", "    matchers:"]
+        for (event, _) in d.events { lines.append("      - event: \(event)") }
+        lines.append(traeEnd)
+        let ourBlock = lines.joined(separator: "\n")
+
+        let existing = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
+        var body = existing
+        if let s = body.range(of: traeBegin), let e = body.range(of: traeEnd) {
+            body.removeSubrange(s.lowerBound..<e.upperBound)
+        }
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newText = trimmed.isEmpty ? ourBlock + "\n" : trimmed + "\n\n" + ourBlock + "\n"
+        if newText == existing { return true }
+        if !existing.isEmpty {
+            try? existing.write(to: fileURL.appendingPathExtension("bak"), atomically: true, encoding: .utf8)
+        }
+        do { try newText.write(to: fileURL, atomically: true, encoding: .utf8)
+             print("[CodeIsland] TraeCli hooks installed at \(fileURL.path)"); return true }
+        catch { Log.error("ProviderInstaller(traecli): write failed: \(error)"); return false }
+    }
+
+    // MARK: - Kiro (agent-scoped JSON)
+
+    /// hooks keyed by event → [{command, matcher:"*", timeout_ms}]; seeds the
+    /// agent skeleton (requires "name") so `kiro --agent codeisland` works.
+    private static func writeKiroAgent(_ d: Descriptor, at url: URL) -> Bool {
+        let cmd = launcherCommand(d.source)
+        return mergeJSONObject(at: url) { root in
+            if root["name"] == nil { root["name"] = "codeisland" }
+            if root["description"] == nil {
+                root["description"] = "Auto-generated by Code Island — relays Kiro hook events to the macOS notch. Launch with `kiro --agent codeisland`."
+            }
+            var hooks = root["hooks"] as? [String: Any] ?? [:]
+            for (event, secs) in d.events {
+                var entries = (hooks[event] as? [[String: Any]] ?? []).filter {
+                    !(($0["command"] as? String)?.contains(marker) ?? false)
+                }
+                entries.append(["command": cmd, "matcher": "*",
+                                "timeout_ms": timeoutValue(secs, .milliseconds)])
+                hooks[event] = entries
+            }
+            root["hooks"] = hooks
+        }
+    }
+
+    // MARK: - Pi / Oh My Pi (TypeScript extension)
+
+    private enum PiImportScope { case pi, omp }
+
+    /// Writes a TypeScript extension that shells out to our launcher (JSON on
+    /// stdin + --event). Gated on the agent root existing; idempotent.
+    private static func installPiExtension(_ d: Descriptor) -> Bool {
+        let extDir = configDir(d)                              // ~/.pi/agent/extensions
+        do { try FileManager.default.createDirectory(at: extDir, withIntermediateDirectories: true) }
+        catch { Log.error("ProviderInstaller(\(d.source)): can't create \(extDir.path): \(error)"); return false }
+        let fileURL = extDir.appendingPathComponent(d.configFileRel)
+        let src = piExtensionTS(source: d.source, scope: d.source == "omp" ? .omp : .pi)
+        if (try? String(contentsOf: fileURL, encoding: .utf8)) != src {
+            do { try src.write(to: fileURL, atomically: true, encoding: .utf8) }
+            catch { Log.error("ProviderInstaller(\(d.source)): write failed: \(error)"); return false }
+        }
+        print("[CodeIsland] \(d.displayName) extension installed at \(fileURL.path)")
+        return true
+    }
+
+    private static func piExtensionTS(source: String, scope: PiImportScope) -> String {
+        let launcher = launcherCommand(source)
+        let importLine = scope == .omp
+            ? #"import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";"#
+            : #"import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";"#
+        return """
+// Code Island \(source) extension — auto-generated. Do not edit.
+// Forwards \(source) lifecycle events to the Code Island macOS app by shelling
+// out to the per-source launcher (JSON on stdin + --event <canonical>).
+import { execFile } from "node:child_process";
+\(importLine)
+
+const LAUNCHER = "\(launcher)";
+
+function send(event, payload) {
+  try {
+    const child = execFile(LAUNCHER, ["--event", event],
+      { timeout: 8000, maxBuffer: 1024 * 1024 }, () => {});
+    child.stdin.write(JSON.stringify(payload)); child.stdin.end();
+  } catch {}
+}
+function sendAndWait(event, payload, timeoutMs = 300000) {
+  return new Promise((resolve) => {
+    try {
+      const child = execFile(LAUNCHER, ["--event", event],
+        { timeout: timeoutMs, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+          if (error) { resolve(null); return; }
+          try { resolve(JSON.parse(stdout)); } catch { resolve(null); }
+        });
+      child.stdin.write(JSON.stringify(payload)); child.stdin.end();
+    } catch { resolve(null); }
+  });
+}
+const DANGEROUS = [/\\brm\\s+(-rf?|--recursive)/i, /\\bsudo\\b/i, /\\b(chmod|chown)\\b.*777/i];
+const isDangerous = (cmd) => DANGEROUS.some((p) => p.test(cmd));
+const titled = (n) => (n || "").charAt(0).toUpperCase() + (n || "").slice(1);
+function base(sid, cwd, extra) { return { session_id: `\(source)-${sid}`, _source: "\(source)", cwd, ...extra }; }
+function lastAssistant(messages) {
+  const a = (messages || []).filter((m) => m && m.role === "assistant");
+  const last = a[a.length - 1];
+  if (!last || !Array.isArray(last.content)) return "";
+  return last.content.filter((c) => c && c.type === "text").map((c) => c.text).join("").trim();
+}
+
+export default function codeislandExtension(pi: ExtensionAPI) {
+  const pending = new Set();
+  pi.on("session_start", async (_e, ctx) => {
+    const name = pi.getSessionName();
+    send("SessionStart", base(ctx.sessionManager.getSessionId(), ctx.cwd, { hook_event_name: "SessionStart", ...(name ? { session_title: name } : {}) }));
+  });
+  pi.on("session_shutdown", async (_e, ctx) => {
+    send("SessionEnd", base(ctx.sessionManager.getSessionId(), ctx.cwd, { hook_event_name: "SessionEnd" }));
+  });
+  pi.on("before_agent_start", async (event, ctx) => {
+    const sid = ctx.sessionManager.getSessionId();
+    if (pending.has(`\(source)-${sid}`)) return;
+    send("UserPromptSubmit", base(sid, ctx.cwd, { hook_event_name: "UserPromptSubmit", prompt: event.prompt ?? "" }));
+  });
+  pi.on("agent_end", async (event, ctx) => {
+    const sid = ctx.sessionManager.getSessionId();
+    if (pending.has(`\(source)-${sid}`)) return;
+    const last = lastAssistant(event.messages);
+    const name = pi.getSessionName();
+    send("Stop", base(sid, ctx.cwd, { hook_event_name: "Stop", last_assistant_message: last || undefined, ...(name ? { session_title: name } : {}) }));
+  });
+  pi.on("tool_call", async (event, ctx) => {
+    const sid = ctx.sessionManager.getSessionId();
+    const key = `\(source)-${sid}`;
+    const toolName = titled(event.toolName);
+    const toolInput = { ...event.input };
+    if (event.toolName === "bash" && event.input.command) toolInput.command = event.input.command;
+    if ((event.toolName === "edit" || event.toolName === "write") && event.input.path) toolInput.file_path = event.input.path;
+    if (event.toolName === "bash" && typeof event.input.command === "string" && isDangerous(event.input.command)) {
+      pending.add(key);
+      const payload = base(sid, ctx.cwd, { hook_event_name: "PermissionRequest", tool_name: toolName, tool_input: toolInput });
+      let resp = null;
+      try { resp = await sendAndWait("PermissionRequest", payload); } finally { pending.delete(key); }
+      const decision = resp?.hookSpecificOutput?.decision;
+      if (decision?.behavior === "deny") return { block: true, reason: "Blocked by Code Island" };
+    }
+    if (!pending.has(key)) send("PreToolUse", base(sid, ctx.cwd, { hook_event_name: "PreToolUse", tool_name: toolName, tool_input: toolInput }));
+    return undefined;
+  });
+  pi.on("tool_result", async (_e, ctx) => {
+    const sid = ctx.sessionManager.getSessionId();
+    if (pending.has(`\(source)-${sid}`)) return;
+    send("PostToolUse", base(sid, ctx.cwd, { hook_event_name: "PostToolUse" }));
+  });
+  pi.on("session_before_compact", async (_e, ctx) => {
+    send("PreCompact", base(ctx.sessionManager.getSessionId(), ctx.cwd, { hook_event_name: "PreCompact" }));
+  });
+}
+"""
     }
 
     // MARK: - OpenCode plugin source

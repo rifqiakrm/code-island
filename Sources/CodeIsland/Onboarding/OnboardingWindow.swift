@@ -189,22 +189,34 @@ struct OnboardingView: View {
         }
     }
 
-    /// A wrapping grid of every supported agent's mascot — communicates the
-    /// breadth of provider support at a glance (Claude, Codex, Gemini, …).
+    /// Every supported agent's mascot — communicates the breadth of provider
+    /// support at a glance. Fixed rows of 6, each centered, so the final
+    /// partial row sits in the middle rather than left-aligned.
     private var providerStrip: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 62), spacing: 10)], spacing: 12) {
-            ForEach(AIProvider.all) { p in
-                VStack(spacing: 4) {
-                    SessionMascot(status: .idle, size: 22, animated: false, provider: p)
-                        .frame(height: 24)
-                    Text(p.displayName)
-                        .font(.system(size: 9))
-                        .foregroundColor(.white.opacity(0.5))
-                        .lineLimit(1)
+        let cols = 6
+        let rows = stride(from: 0, to: AIProvider.all.count, by: cols).map {
+            Array(AIProvider.all[$0 ..< min($0 + cols, AIProvider.all.count)])
+        }
+        return VStack(spacing: 12) {
+            ForEach(rows.indices, id: \.self) { i in
+                HStack(spacing: 10) {
+                    ForEach(rows[i]) { p in providerCell(p) }
                 }
             }
         }
-        .frame(maxWidth: 460)
+        .frame(maxWidth: 470)
+    }
+
+    private func providerCell(_ p: AIProvider) -> some View {
+        VStack(spacing: 4) {
+            SessionMascot(status: .idle, size: 22, animated: false, provider: p)
+                .frame(height: 24)
+            Text(p.displayName)
+                .font(.system(size: 9))
+                .foregroundColor(.white.opacity(0.5))
+                .lineLimit(1)
+        }
+        .frame(width: 64)
     }
 
     private var themeStep: some View {
@@ -564,20 +576,20 @@ struct WhatsNewView: View {
 
     private let highlights: [Highlight] = [
         .init(symbol: "sparkles", tint: Color(red: 0.62, green: 0.42, blue: 1.0),
-              title: "10 new coding agents",
-              detail: "Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot, Kimi, OpenCode & Cline."),
+              title: "21 coding agents, one notch",
+              detail: "Claude, Codex, Gemini, Cursor, Copilot, Trae, Kiro, Pi, Qwen, Qoder, Factory, CodeBuddy, Kimi, OpenCode, Cline & more — side by side."),
         .init(symbol: "face.smiling", tint: Color(red: 0.42, green: 0.95, blue: 0.75),
               title: "A mascot for everyone",
-              detail: "Every agent gets its own animated pixel mascot, themed to its brand."),
+              detail: "Every agent gets its own animated pixel mascot and logo, themed to its brand."),
         .init(symbol: "bell.badge", tint: Color(red: 1.0, green: 0.72, blue: 0.30),
-              title: "More in-notch permissions",
-              detail: "Approve / deny & answer questions for Qwen, Qoder & OpenCode — alongside Claude & Codex."),
+              title: "Smart, per-agent permissions",
+              detail: "Approve, deny, or answer questions right in the notch — with the buttons each tool actually supports."),
         .init(symbol: "lock.shield", tint: Color(red: 0.37, green: 0.78, blue: 1.0),
               title: "“Review every action” mode",
-              detail: "Optional strict approval for Gemini, Cursor, Copilot & Kimi — in Settings → General."),
+              detail: "Optional strict approval for agents without a native prompt (Gemini, Cursor, Trae, Copilot, Kimi) — Settings → General."),
         .init(symbol: "hand.wave", tint: Self.accent,
-              title: "Polished onboarding",
-              detail: "Refreshed welcome flow with a Back button, plus a pile of fixes."),
+              title: "Refreshed onboarding",
+              detail: "A new welcome flow with a Back button, this What's New card, plus a pile of fixes."),
     ]
 
     var body: some View {
@@ -620,11 +632,21 @@ struct WhatsNewView: View {
         )
     }
 
-    /// All provider mascots in a row, gently bouncing (status = thinking).
+    /// All provider mascots, gently bouncing (status = thinking). Split into two
+    /// balanced, centered rows — 21 don't fit one line in a 560pt window.
     private var mascotParade: some View {
-        HStack(spacing: 3) {
-            ForEach(AIProvider.all) { p in
-                SessionMascot(status: .thinking, size: 26, animated: true, provider: p)
+        let all = AIProvider.all
+        let mid = (all.count + 1) / 2
+        return VStack(spacing: 8) {
+            mascotRow(Array(all[0..<mid]))
+            mascotRow(Array(all[mid...]))
+        }
+    }
+
+    private func mascotRow(_ providers: [AIProvider]) -> some View {
+        HStack(spacing: 5) {
+            ForEach(providers) { p in
+                SessionMascot(status: .thinking, size: 24, animated: true, provider: p)
             }
         }
     }

@@ -131,9 +131,56 @@ struct AIProvider: Identifiable, Hashable {
         mascotShape: .clineBot
     )
 
+    static let trae = AIProvider(
+        id: "trae", displayName: "Trae",
+        accentColor: Color(red: 0.953, green: 0.286, blue: 0.275),  // Trae coral-red
+        mascotPalette: .trae, activeMascotPalette: .traeActive, mascotShape: .traeRocket
+    )
+    static let traecli = AIProvider(
+        id: "traecli", displayName: "TraeCli",
+        accentColor: Color(red: 0.94, green: 0.18, blue: 0.14),  // Trae red
+        mascotPalette: .traecli, activeMascotPalette: .traecliActive, mascotShape: .traeBolt
+    )
+    static let kiro = AIProvider(
+        id: "kiro", displayName: "Kiro",
+        accentColor: Color(red: 0.49, green: 0.36, blue: 1.00),  // Kiro violet
+        mascotPalette: .kiro, activeMascotPalette: .kiroActive, mascotShape: .kiroGhost
+    )
+    static let pi = AIProvider(
+        id: "pi", displayName: "Pi",
+        accentColor: Color(red: 0.96, green: 0.69, blue: 0.13),  // Pi amber
+        mascotPalette: .pi, activeMascotPalette: .piActive, mascotShape: .piGlyph
+    )
+    static let ohMyPi = AIProvider(
+        id: "omp", displayName: "Oh My Pi",
+        accentColor: Color(red: 0.13, green: 0.78, blue: 0.74),  // OMP teal
+        mascotPalette: .omp, activeMascotPalette: .ompActive, mascotShape: .piGlyph
+    )
+    static let stepfun = AIProvider(
+        id: "stepfun", displayName: "StepFun",
+        accentColor: Color(red: 0.247, green: 0.318, blue: 0.953),  // StepFun indigo
+        mascotPalette: .stepfun, activeMascotPalette: .stepfunActive, mascotShape: .stepfunStairs
+    )
+    static let antigravity = AIProvider(
+        id: "antigravity", displayName: "AntiGravity",
+        accentColor: Color(red: 0.259, green: 0.522, blue: 0.957),  // Google blue
+        mascotPalette: .antigravity, activeMascotPalette: .antigravityActive, mascotShape: .antigravityOrbit
+    )
+    static let workbuddy = AIProvider(
+        id: "workbuddy", displayName: "WorkBuddy",
+        accentColor: Color(red: 0.000, green: 0.322, blue: 0.851),  // Tencent blue
+        mascotPalette: .workbuddy, activeMascotPalette: .workbuddyActive, mascotShape: .workbuddyPal
+    )
+    static let hermes = AIProvider(
+        id: "hermes", displayName: "Hermes",
+        accentColor: Color(red: 0.953, green: 0.722, blue: 0.196),  // Hermes gold
+        mascotPalette: .hermes, activeMascotPalette: .hermesActive, mascotShape: .hermesWing
+    )
+
     static let all: [AIProvider] = [
         .claude, .codex, .gemini, .qwen, .qoder, .factory, .codebuddy, .cursor, .copilot,
         .kimi, .opencode, .cline,
+        .trae, .traecli, .kiro, .pi, .ohMyPi, .stepfun, .antigravity, .workbuddy, .hermes,
     ]
 
     static func from(_ source: String?) -> AIProvider {
@@ -150,8 +197,8 @@ struct AIProvider: Identifiable, Hashable {
         switch id {
         case "claude", "codex":          return [.deny, .allowOnce, .allowAll, .bypass]
         case "qwen", "qoder", "opencode": return [.deny, .allowOnce, .allowAll]
-        case "cursor", "copilot":        return [.deny, .allowOnce, .deferToApp]
-        default:                         return [.deny, .allowOnce]   // gemini, kimi
+        case "cursor", "copilot", "trae": return [.deny, .allowOnce, .deferToApp]
+        default:                         return [.deny, .allowOnce]   // gemini, kimi, forks, pi, kiro, …
         }
     }
 }

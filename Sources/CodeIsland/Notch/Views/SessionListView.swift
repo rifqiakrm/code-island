@@ -118,7 +118,7 @@ struct SessionListView: View {
                     Text("No active sessions")
                         .font(theme.font(size: 12))
                         .foregroundColor(.white.opacity(0.4))
-                    Text("Start Claude Code to begin")
+                    Text("Start any coding agent to begin")
                         .font(theme.font(size: 11))
                         .foregroundColor(.white.opacity(0.3))
                 }

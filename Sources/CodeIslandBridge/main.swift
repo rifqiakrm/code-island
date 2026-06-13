@@ -85,7 +85,35 @@ let eventNormalization: [String: [String: String]] = [
         "TaskStart": "SessionStart", "TaskResume": "UserPromptSubmit",
         "TaskComplete": "Stop", "TaskCancel": "Stop",
     ],
+    // Trae (ByteDance) — identical flat vocabulary to Cursor.
+    "trae": [
+        "beforeSubmitPrompt": "UserPromptSubmit",
+        "beforeShellExecution": "PreToolUse", "afterShellExecution": "PostToolUse",
+        "beforeReadFile": "PreToolUse", "afterFileEdit": "PostToolUse",
+        "beforeMCPExecution": "PreToolUse", "afterMCPExecution": "PostToolUse",
+        "afterAgentThought": "Notification", "afterAgentResponse": "Stop", "stop": "skip",
+    ],
+    // TraeCli — snake_case event vocabulary.
+    "traecli": [
+        "session_start": "SessionStart", "session_end": "SessionEnd",
+        "user_prompt_submit": "UserPromptSubmit",
+        "pre_tool_use": "PreToolUse", "post_tool_use": "PostToolUse",
+        "post_tool_use_failure": "skip",
+        "permission_request": "skip",  // not subscribed; native handling (see installer)
+        "notification": "Notification",
+        "subagent_start": "SubagentStart", "subagent_stop": "SubagentStop",
+        "stop": "Stop", "pre_compact": "PreCompact", "post_compact": "skip",
+    ],
+    // Kiro — camelCase; no SessionEnd (process sweep handles teardown).
+    "kiro": [
+        "agentSpawn": "SessionStart", "userPromptSubmit": "UserPromptSubmit",
+        "preToolUse": "PreToolUse", "postToolUse": "PostToolUse", "stop": "Stop",
+    ],
+    // Pi / Oh My Pi extensions emit canonical names already; just drop PostCompact.
+    "pi":  ["PostCompact": "skip"],
+    "omp": ["PostCompact": "skip"],
     // kimi & opencode emit canonical names already → identity (not listed).
+    // Claude forks (stepfun/antigravity/workbuddy/hermes) → identity.
 ]
 // Strict-approval gate. Gemini/Cursor/Copilot/Kimi don't have a selective
 // permission event — only blanket "before every tool" hooks. When the user
@@ -95,6 +123,7 @@ let eventNormalization: [String: [String: String]] = [
 let permissionGateEvents: [String: Set<String>] = [
     "gemini": ["BeforeTool"],
     "cursor": ["beforeShellExecution", "beforeMCPExecution"],
+    "trae": ["beforeShellExecution", "beforeMCPExecution"],
     "copilot": ["preToolUse"],
     "kimi": ["PreToolUse"],
 ]
@@ -475,7 +504,7 @@ func translateStrictDecision(source: String, appResponse: Data) -> Data {
     case "gemini":
         // Gemini has no "ask" — treat it as allow.
         json = deny ? "{\"decision\":\"deny\",\"reason\":\"\(reason)\"}" : "{\"decision\":\"allow\"}"
-    case "cursor":
+    case "cursor", "trae":
         if deny { json = "{\"permission\":\"deny\",\"agent_message\":\"\(reason)\"}" }
         else if ask { json = "{\"permission\":\"ask\"}" }
         else { json = "{\"permission\":\"allow\"}" }

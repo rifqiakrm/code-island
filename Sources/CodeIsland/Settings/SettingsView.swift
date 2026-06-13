@@ -61,7 +61,7 @@ struct SettingsView: View {
 
     @State private var selection: SettingsSection = .general
 
-    /// "v1.3.0" when bundled normally; "dev" when run from `swift run` /
+    /// "v1.4.0" when bundled normally; "dev" when run from `swift run` /
     /// `.build/debug/CodeIsland` (no Info.plist version baked in).
     private var displayVersion: String {
         let v = updateChecker.currentVersion

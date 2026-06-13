@@ -1,6 +1,6 @@
 # Code Island
 
-A native macOS Swift app that turns your MacBook's notch into a live dashboard for **12 AI coding agents** — Claude Code, Codex, Gemini, Qwen, Qoder, Factory (`droid`), CodeBuddy, Cursor, Copilot, Kimi, OpenCode, and Cline. Inspired by [Vibe Island](https://vibeisland.app). See [README.md](README.md) for user-facing docs.
+A native macOS Swift app that turns your MacBook's notch into a live dashboard for **21 AI coding agents** — Claude Code, Codex, Gemini, Qwen, Qoder, Factory (`droid`), CodeBuddy, Cursor, Copilot, Kimi, OpenCode, Cline, Trae, TraeCli, Kiro, Pi, Oh My Pi (`omp`), StepFun, AntiGravity, WorkBuddy, and Hermes. Inspired by [Vibe Island](https://vibeisland.app). See [README.md](README.md) for user-facing docs.
 
 ## Architecture
 
@@ -23,9 +23,9 @@ Code Island.app/
 
 ## Provider Abstraction
 
-`AIProvider` (Sources/CodeIsland/Session/AIProvider.swift) unifies all 12 agents with:
+`AIProvider` (Sources/CodeIsland/Session/AIProvider.swift) unifies all 21 agents with:
 - `id`, `displayName`, `accentColor`
-- `mascotShape` (per-agent Canvas pixel art — `.crab`, `.box`, `.geminiStar`, `.qwenGem`, `.qoderBlob`, `.factoryBot`, `.buddyCat`, `.cursorBox`, `.copilotBot`, `.kimiMoon`, `.openCodeMark`, `.clineBot`)
+- `mascotShape` (per-agent Canvas pixel art — `.crab`, `.box`, `.geminiStar`, `.qwenGem`, `.qoderBlob`, `.factoryBot`, `.buddyCat`, `.cursorBox`, `.copilotBot`, `.kimiMoon`, `.openCodeMark`, `.clineBot`, `.traeRocket`, `.traeBolt`, `.kiroGhost`, `.piGlyph` (Pi + Oh My Pi), `.stepfunStairs`, `.antigravityOrbit`, `.workbuddyPal`, `.hermesWing`)
 - `mascotPalette` / `activeMascotPalette`
 - `AIProvider.from(source:)` maps the bridge's `source` field to a provider
 - `AIProvider.all` is the source of truth — adding a provider here flows it everywhere (filter chips, grouping, mascot, accent)
@@ -140,7 +140,7 @@ Live-fetched over HTTP (not statusline anymore):
 - **Collapsed** — mascot left, session count right
 - **Expanded** (hover) — rate limit bar + sound toggle + settings gear + filter chips (when ≥2 providers active) + collapsible per-provider section list
 - **Finished** (Stop event) — rate limit bar + session card with scrollable response + Done button, auto-collapses in 3s
-- **Permission** — rate limit bar + tool details + **provider-aware buttons** (`AIProvider.permissionActions`): Claude/Codex get Deny·Allow Once·Allow All·Bypass; Qwen/Qoder/OpenCode drop Bypass; Cursor/Copilot show Deny·Allow Once·"Decide in <app>" (defers via behavior "ask" + jump); Gemini/Kimi show only Deny·Allow Once. Showing a button the tool can't honor (silent no-op) is worse than omitting it.
+- **Permission** — rate limit bar + tool details + **provider-aware buttons** (`AIProvider.permissionActions`): Claude/Codex get Deny·Allow Once·Allow All·Bypass; Qwen/Qoder/OpenCode drop Bypass; Cursor/Copilot/Trae show Deny·Allow Once·"Decide in <app>" (defers via behavior "ask" + jump); everyone else shows Deny·Allow Once. Showing a button the tool can't honor (silent no-op) is worse than omitting it.
 - **Question** — rate limit bar + all questions shown, pill buttons, multi-select (Claude only), Submit All Answers
 
 ## Theming
@@ -187,10 +187,11 @@ Process-based, not time-based. Every 5s, `SessionStore.sweepClosedAgents()` call
 All mascots are Canvas-drawn pixel art in `PixelMascot.swift`, authored in a 52-unit-tall logical space. Each agent has its own `MascotShape` + idle/active `MascotPalette`:
 - **Claude** crab, **Codex** terminal box (these two animate their legs/feet directly).
 - **Gemini** star, **Qwen** gem, **Qoder** blob, **Factory** industrial bot, **CodeBuddy** cat, **Cursor** editor box, **Copilot** goggled bot, **Kimi** lunar orb, **OpenCode** monitor box, **Cline** rounded bot.
+- **Trae** rocket, **TraeCli** terminal box, **Kiro** ghost, **Pi**/**Oh My Pi** π-creature (amber/teal, shared `.piGlyph`), **StepFun** staircase, **AntiGravity** orbiting planet, **WorkBuddy** headset bot, **Hermes** winged helmet.
 
 The provider mascots are drawn via the shared `drawShape(...)` helper, which applies a **whole-body bounce** when `animate` is true (the "thinking" liveliness) — no per-mascot leg rig. Color swaps via `mascotPalette` vs `activeMascotPalette`; transient statuses (thinking/error/waiting) override the provider palette so status reads at a glance (`SessionMascot.paletteFor`).
 
-Brand-original mascots (no reference art): Qwen, Copilot, Kimi. The rest were ported from the reference repo's gifs into our pixel style.
+The 9 newest mascots (Trae … Hermes) are brand-original pixel art (no reference gif existed). README/onboarding/What's-New render the live `PixelMascot` code to `docs/mascots/<id>.png`. CLI icons live at `Resources/cli-icons/<id>.png` — real logos for all 21 (TraeCli reuses `trae.png`; Kiro/Oh My Pi supplied by the maintainer).
 
 ## Building
 
@@ -235,25 +236,28 @@ Three installers run idempotently on every launch (`AppDelegate.applicationDidFi
 ### Claude (`HookInstaller`) — `~/.claude/settings.json`, all events with `matcher: "*"`, launcher `code-island-bridge`.
 ### Codex (`CodexInstaller`) — `~/.codex/hooks.json` (nested, no matcher) + `[features].hooks = true` in `config.toml`; launcher `code-island-codex-bridge`. Also persists Allow-All/Bypass as `prefix_rule(...)` (see Codex Permission Persistence).
 
-### The other 10 (`ProviderInstaller`, Sources/CodeIsland/Utilities/ProviderInstaller.swift)
+### The other 19 (`ProviderInstaller`, Sources/CodeIsland/Utilities/ProviderInstaller.swift)
 A single descriptor-driven engine. Each provider is a `Descriptor` (source, config path, `Format`, `TimeoutUnit`, events, `createDirIfMissing`, `detectPaths`). Only installs when the tool is present (config dir exists OR a `detectPaths` entry exists), except Factory which bootstraps. `Format` cases:
-- `.claudeFork` — `{matcher:"*", hooks:[{type,command,timeout}]}` per event. **Gemini timeouts are ms**, the rest seconds. (Qwen/Qoder/Factory/CodeBuddy.)
+- `.claudeFork` — `{matcher:"*", hooks:[{type,command,timeout}]}` per event. **Gemini timeouts are ms**, the rest seconds. (Qwen/Qoder/Factory/CodeBuddy/StepFun/AntiGravity/WorkBuddy/Hermes.)
 - `.nested` — like claudeFork without `matcher` (Gemini).
-- `.flat` — `[{command}]`, event via `--event` (Cursor).
+- `.flat` — `[{command}]`, event via `--event` (Cursor, Trae).
 - `.copilot` — `{version:1, hooks:{event:[{type,bash,timeoutSec}]}}`, event via `--event`.
 - `.toml` — Kimi: marker-delimited `[[hooks]]` block appended to `~/.kimi/config.toml` (text merge, not JSON).
 - `.opencodePlugin` — writes a JS plugin to `~/.config/opencode/plugins/codeisland.js` and registers it in `opencode.json`'s `plugin` array (JSONC-tolerant).
 - `.clineScripts` — one executable bash script per event in `~/Documents/Cline/Hooks/` (chmod 0755), each pipes stdin → launcher `--event` and prints `{"cancel":false}`.
+- `.traecliYAML` — TraeCli: marker-delimited YAML block (one `- type: command` with all events as `matchers`, `timeout: "<n>s"`) appended to `~/.trae/traecli.yaml`.
+- `.kiroAgent` — Kiro: agent-scoped JSON at `~/.kiro/agents/codeisland.json` (`{command,matcher,timeout_ms}` + seeded `name`). **Only fires when launched as `kiro --agent codeisland`.**
+- `.piExtension` — Pi / Oh My Pi: a TypeScript extension written to `~/.<src>/agent/extensions/codeisland.ts` that shells out to the launcher per event (import scope differs pi vs omp).
 
 `installSource(_:)` force-installs one provider (Settings → Providers reinstall buttons). Returns `Bool` for the onboarding checkmark/retry UI.
 
 ## Permission Support per Provider
 
-Only agents with a **selective** permission hook drive the in-notch approve/deny+question UI: **Claude, Codex, Qwen, Qoder** (Claude-shape `PermissionRequest`), and **OpenCode** (plugin handles `permission.asked`). Factory/CodeBuddy use the Claude-fork default event set that omits `PermissionRequest`; Gemini/Cursor/Copilot/Kimi only have blanket "before every tool" hooks (no native selective event); Cline's file hooks are observe-only. (Verified against the reference repo's tested config — don't subscribe forks to `PermissionRequest` speculatively; it risks a hook hang.)
+Agents that drive the in-notch approve/deny+question UI: **Claude, Codex, Qwen, Qoder** (Claude-shape `PermissionRequest`), **OpenCode** (plugin handles `permission.asked`), and **Pi / Oh My Pi** (the TS extension sends `PermissionRequest` for risky shell commands and honors the decision). The Claude forks that omit `PermissionRequest` (Factory, CodeBuddy, StepFun, AntiGravity, WorkBuddy, Hermes), TraeCli (not a Claude fork — its permission response shape is unverified, so we deliberately DON'T subscribe `permission_request`, to avoid a no-op/hang), Kiro, and Cline (observe-only file hooks) handle approvals natively. Gemini/Cursor/Trae/Copilot/Kimi only have blanket "before every tool" hooks → opt-in strict approval below. (Don't subscribe non-Claude-fork tools to a blocking permission hook speculatively — it risks a hang.)
 
 ## Strict Approval ("Review every action")
 
-Opt-in, per provider, for the four blanket-hook tools (**Gemini, Cursor, Copilot, Kimi**) that lack a selective permission event. `SettingsStore.strictApproval: [String: Bool]` is persisted to UserDefaults AND mirrored to `~/.code-island/config.json`. The bridge reads that file each run; when a provider's flag is on and the event is one of its gate events (`permissionGateEvents` in main.swift — Gemini `BeforeTool`, Cursor `beforeShellExecution`/`beforeMCPExecution`, Copilot `preToolUse`, Kimi `PreToolUse`), it routes the event through the blocking `PermissionRequest` path and **translates** the app's Claude-shaped decision into the tool's native response (`{"permission":…}` / `{"decision":…}` / `{"permissionDecision":…}` / Kimi's `hookSpecificOutput`). Gate-event hook timeouts are installed long (~5 min) so the prompt has time; off → the bridge returns instantly (today's PreToolUse behavior). Settings → General → "Review every action".
+Opt-in, per provider, for the blanket-hook tools (**Gemini, Cursor, Trae, Copilot, Kimi**) that lack a selective permission event. `SettingsStore.strictApproval: [String: Bool]` is persisted to UserDefaults AND mirrored to `~/.code-island/config.json`. The bridge reads that file each run; when a provider's flag is on and the event is one of its gate events (`permissionGateEvents` in main.swift — Gemini `BeforeTool`, Cursor/Trae `beforeShellExecution`/`beforeMCPExecution`, Copilot `preToolUse`, Kimi `PreToolUse`), it routes the event through the blocking `PermissionRequest` path and **translates** the app's Claude-shaped decision into the tool's native response (`{"permission":…}` / `{"decision":…}` / `{"permissionDecision":…}` / Kimi's `hookSpecificOutput`). Gate-event hook timeouts are installed long (~5 min) so the prompt has time; off → the bridge returns instantly (today's PreToolUse behavior). Settings → General → "Review every action".
 
 ## Onboarding & What's New
 
