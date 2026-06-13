@@ -625,6 +625,20 @@ swift build -c release
         i = (i + 1) % seq.length;
         setTimeout(step, cur.hold);
       }
+      // Fit the fixed-width (≤500px) notch demo into narrow viewports so it's
+      // never clipped by the MacBook frame's overflow:hidden. Scales to the
+      // frame's actual content width — robust across every phone size.
+      const macbook = document.querySelector('.macbook');
+      function fitDemo() {
+        if (!macbook) return;
+        const cs = getComputedStyle(macbook);
+        const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+        const avail = macbook.clientWidth - padX - 12;  // content width, minus breathing room
+        shape.style.setProperty('--demo-scale', Math.min(1, avail / 500).toFixed(3));
+      }
+      fitDemo();
+      window.addEventListener('resize', fitDemo);
+
       // Start after a frame so initial heights are measured properly.
       requestAnimationFrame(step);
     })();
