@@ -19,6 +19,7 @@ Works with **Claude Code** and **OpenAI Codex** out of the box.
 - **Dynamic terminal detection** — iTerm2, Ghostty, Terminal.app, VS Code, JetBrains, Codex.app, and more
 - **8-bit sound effects** — per-event toggles with optional custom sound packs
 - **Pixel-art mascots** — Claude (crab) and Codex (terminal box) animate by status
+- **Notch themes** — 5 looks (Default, Liquid Glass, Retro Pixel, Terminal, Neo-Brutalist), switch live in Settings → Appearance
 
 ## Requirements
 
@@ -43,6 +44,18 @@ Works with **Claude Code** and **OpenAI Codex** out of the box.
 3. Bridge enriches the payload (terminal detection via process tree walk, `--source` flag tagging) and forwards it to the app via Unix socket at `/tmp/code-island.sock`
 4. For `PermissionRequest`: the socket connection stays open, the app sends a response back, and the bridge writes it to stdout for the agent
 5. For Codex's `request_user_input` (multi-choice questions): the question is mirrored in the notch; clicking activates Codex.app so you can answer there
+
+## Themes
+
+Open **Settings → Appearance** to restyle the notch windows. Switching is instant — no restart.
+
+- **Default** — the original: pure black, monospaced, soft rounded cards
+- **Liquid Glass** — frosted translucency and pill controls, native macOS feel
+- **Retro Pixel** — 8-bit chunky borders, square corners, colored hard shadows
+- **Terminal** — pure black with hairline chrome, disappears into the notch
+- **Neo-Brutalist** — bold light cards, thick black borders, hard shadows, cream code wells
+
+Themes only restyle the *chrome*. Your mascots, status colors, and rate-limit warnings stay consistent across all of them. New installs start on **Default**.
 
 ## Architecture
 

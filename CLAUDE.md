@@ -132,10 +132,37 @@ Live-fetched over HTTP (not statusline anymore):
 ## States
 
 - **Collapsed** — mascot left, session count right
-- **Expanded** (hover) — rate limit bar + sound toggle + settings gear + filter chips (when ≥2 providers active) + collapsible per-provider section list + footer
+- **Expanded** (hover) — rate limit bar + sound toggle + settings gear + filter chips (when ≥2 providers active) + collapsible per-provider section list
 - **Finished** (Stop event) — rate limit bar + session card with scrollable response + Done button, auto-collapses in 3s
 - **Permission** — rate limit bar + tool details + 4 buttons (Deny, Allow Once, Allow All, Bypass)
 - **Question** — rate limit bar + all questions shown, pill buttons, multi-select (Claude only), Submit All Answers
+
+## Theming
+
+`NotchTheme` (Sources/CodeIsland/Notch/NotchTheme.swift) is a pure token set that restyles the notch **chrome only**. Five themes, selectable in **Settings → Appearance** (live preview cards, instant switching):
+
+- `default` — the original look, **unchanged** (load-bearing: existing users must see no difference)
+- `glass` — Liquid Glass (translucent `.ultraThinMaterial` window, capsule controls, sans font)
+- `pixel` — Retro 8-bit (dark cards, colored borders + colored hard offset shadows, square corners, mono)
+- `terminal` — minimal (pure black, hairline chrome, mono)
+- `brutalist` — Neo-Brutalist (vivid light cards + dark text, cream wells, black borders, hard white shadows, sans)
+
+**Wiring**
+- Persisted as `SettingsStore.notchThemeID` (UserDefaults, same `@Published`+`didSet` pattern). No pref / first launch → `.default` (the `didSet` only writes on user change, so a fresh install never persists a theme).
+- `NotchContentView` reads `settingsStore.notchThemeID.theme` and injects `.environment(\.notchTheme, theme)`. Every view reads `@Environment(\.notchTheme) private var theme`.
+
+**Invariant — chrome only.** Themes restyle window fill/border, card/box/pill/button shape (radius, stroke width, shadow), and font *design* (mono ↔ sans). They never touch **semantic/brand colors**: provider accents, mascot palettes, status colors (cyan/green/orange/red), tool colors, action-button red/green/purple, rate-limit thresholds. `cardForeground`/`wellForeground` default to `.white`, so the four dark themes render text identically to Default; only `brutalist` opts into dark text on its light cards/cream wells.
+
+**Tokens & helpers**
+- `theme.font(size:weight:)` — replaces `.system(…, design: .monospaced)` so a theme swaps the whole app mono↔sans.
+- Drop-in background modifiers: `.notchCard(theme, tint:active:)`, `.notchBox(theme)`, `.notchPill(theme, fill:stroke:base:)`, `.notchButton(theme, fill:stroke:)`. **Shadows apply to the background SHAPE, not `self`** — a hard shadow on the whole view ghosts every glyph of text inside it.
+- `PillCorner` policy (`.asAuthored`/`.square`/`.capsule`/`.cap`) lets each pill keep its authored `base` radius on Default while themes reshape it.
+- `theme.buttonInk(accent)` → per-theme `(fill, stroke, text)` for action buttons.
+- `theme.cardHueActive`/`cardHueIdle` — Pixel/Brutalist tint cards by activity (terracotta/sky-or-gray) instead of status; error→red + waiting→orange stay semantic (remap lives in `SessionCardView.cardTint`).
+- `NotchBorderShape` strokes sides+bottom only (flush top, no seam) for bordered themes. The **collapsed strip is forced pure black in every theme** — only expanded windows are themed (`NotchBackground` branches on `isExpanded`).
+- `SyntaxHighlighter.Theme.light` — dark-on-light palette used when `theme.lightWells` (Brutalist cream wells), passed to `highlight(...)`/`diff(...)`.
+
+**Adding a theme**: add a `NotchThemeID` case + a `NotchTheme` instance in `NotchTheme.all`. It flows everywhere automatically; new windows that use the token modifiers theme for free.
 
 ## Permission/Question Queue
 
