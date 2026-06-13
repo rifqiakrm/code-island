@@ -3,6 +3,7 @@ import SwiftUI
 struct CollapsedNotchView: View {
     @ObservedObject var sessionStore: SessionStore
     @ObservedObject var rateLimitStore: RateLimitStore
+    @Environment(\.notchTheme) private var theme
 
     var body: some View {
         HStack {
@@ -20,7 +21,7 @@ struct CollapsedNotchView: View {
                     .fill(statusColor)
                     .frame(width: 6, height: 6)
                 Text("\(sessionStore.activeSessions.count)")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .font(theme.font(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
             }
         }

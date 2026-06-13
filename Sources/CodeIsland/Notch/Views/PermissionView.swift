@@ -9,6 +9,7 @@ struct PermissionView: View {
     let onOpenSettings: () -> Void
     let onToggleExpand: (Bool) -> Void
 
+    @Environment(\.notchTheme) private var theme
     @State private var isExpanded = false
 
     var body: some View {
@@ -38,21 +39,18 @@ struct PermissionView: View {
             HStack(spacing: 8) {
                 SessionMascot(status: .waitingPermission, size: 18, provider: session.provider)
                 Text(session.displayName)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 13, weight: .bold))
                     .foregroundColor(.white)
                 HStack(spacing: 4) {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 9))
                     Text("Needs approval")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(theme.font(size: 9, weight: .semibold))
                 }
                 .foregroundColor(.orange)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(.orange.opacity(0.15))
-                )
+                .notchPill(theme, fill: .orange.opacity(0.15))
                 Spacer()
                 if let effort = session.effortLevel {
                     EffortBadge(level: effort)
@@ -68,17 +66,14 @@ struct PermissionView: View {
                     Image(systemName: iconForTool(permission.toolName))
                         .font(.system(size: 10))
                     Text(permission.toolName)
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(theme.font(size: 11, weight: .bold))
                 }
                 .foregroundColor(colorForTool(permission.toolName))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(colorForTool(permission.toolName).opacity(0.15))
-                )
+                .notchPill(theme, fill: colorForTool(permission.toolName).opacity(0.15))
                 Text(subtitleForTool(permission.toolName))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(theme.font(size: 11))
                     .foregroundColor(.white.opacity(0.65))
                 Spacer()
             }
@@ -92,26 +87,19 @@ struct PermissionView: View {
                         .font(.system(size: 11))
                         .foregroundColor(colorForTool(permission.toolName).opacity(0.8))
                     Text(pathRowLabel(permission.toolName))
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.5))
+                        .font(theme.font(size: 9, weight: .bold))
+                        .foregroundColor(theme.wellForeground.opacity(0.5))
                         .kerning(0.5)
                     Text(shortenPath(path))
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(theme.font(size: 11))
+                        .foregroundColor(theme.wellForeground.opacity(0.8))
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.white.opacity(0.08))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                        )
-                )
+                .notchBox(theme)
                 .padding(.horizontal, 14)
                 .padding(.bottom, 8)
             }
@@ -123,23 +111,23 @@ struct PermissionView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "chevron.left.forwardslash.chevron.right")
                                 .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(theme.wellForeground.opacity(0.5))
                             Text(preview.label)
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(theme.font(size: 9, weight: .bold))
+                                .foregroundColor(theme.wellForeground.opacity(0.5))
                                 .kerning(0.5)
                         }
                         Spacer()
                         Text(preview.metric)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.4))
+                            .font(theme.font(size: 9))
+                            .foregroundColor(theme.wellForeground.opacity(0.4))
                         Button(action: {
                             isExpanded.toggle()
                             onToggleExpand(isExpanded)
                         }) {
                             Image(systemName: isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.55))
+                                .foregroundColor(theme.wellForeground.opacity(0.55))
                         }
                         .buttonStyle(.plain)
                         .help(isExpanded ? "Collapse" : "Expand content")
@@ -147,26 +135,26 @@ struct PermissionView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
-                        UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8)
-                            .fill(.white.opacity(0.08))
+                        UnevenRoundedRectangle(topLeadingRadius: theme.boxRadius, topTrailingRadius: theme.boxRadius)
+                            .fill(theme.boxFill)
                     )
 
                     ScrollView {
                         Text(preview.attributed)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(theme.font(size: 11))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
                             .padding(10)
                     }
                     .frame(maxHeight: isExpanded ? 400 : 220)
                     .background(
-                        UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8)
-                            .fill(.white.opacity(0.05))
+                        UnevenRoundedRectangle(bottomLeadingRadius: theme.boxRadius, bottomTrailingRadius: theme.boxRadius)
+                            .fill(theme.boxFill)
                     )
                 }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: theme.boxRadius, style: .continuous)
+                        .strokeBorder(theme.boxStroke, lineWidth: theme.strokeWidth)
                 )
                 .padding(.horizontal, 14)
             }
@@ -270,7 +258,7 @@ struct PermissionView: View {
             return PreviewData(
                 label: "edit",
                 metric: "−\(oldLines) +\(lines) lines",
-                attributed: SyntaxHighlighter.diff(old: oldStr, new: newStr, startLine: startLine)
+                attributed: SyntaxHighlighter.diff(old: oldStr, new: newStr, theme: theme.lightWells ? SyntaxHighlighter.Theme.light : SyntaxHighlighter.Theme.dark, startLine: startLine)
             )
         }
         // Write tool: show content with syntax highlighting (or WebFetch: show prompt plain)
@@ -282,10 +270,10 @@ struct PermissionView: View {
             let attributed: AttributedString
             if isWebFetch {
                 var s = AttributedString(content)
-                s.foregroundColor = .white.opacity(0.85)
+                s.foregroundColor = theme.wellForeground.opacity(0.85)
                 attributed = s
             } else {
-                attributed = SyntaxHighlighter.highlight(content, withLineNumbers: true, startLine: 1)
+                attributed = SyntaxHighlighter.highlight(content, theme: theme.lightWells ? SyntaxHighlighter.Theme.light : SyntaxHighlighter.Theme.dark, withLineNumbers: true, startLine: 1)
             }
             return PreviewData(
                 label: isWebFetch ? "prompt" : "content",
@@ -299,9 +287,9 @@ struct PermissionView: View {
             return PreviewData(
                 label: isBash ? "command" : "input",
                 metric: "",
-                attributed: isBash ? SyntaxHighlighter.highlight(desc) : {
+                attributed: isBash ? SyntaxHighlighter.highlight(desc, theme: theme.lightWells ? SyntaxHighlighter.Theme.light : SyntaxHighlighter.Theme.dark) : {
                     var s = AttributedString(desc)
-                    s.foregroundColor = .white.opacity(0.85)
+                    s.foregroundColor = theme.wellForeground.opacity(0.85)
                     return s
                 }()
             )
@@ -322,21 +310,21 @@ struct ActionButton: View {
     let color: Color
     let action: () -> Void
 
+    @Environment(\.notchTheme) private var theme
+
     var body: some View {
-        Button(action: action) {
+        let ink = theme.buttonInk(color)
+        return Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
                 Text(label)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(theme.font(size: 11, weight: .semibold))
             }
-            .foregroundColor(color.opacity(0.95))
+            .foregroundColor(ink.text)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(color.opacity(0.08))
-            )
+            .notchButton(theme, fill: ink.fill, stroke: ink.stroke)
         }
         .buttonStyle(.plain)
     }

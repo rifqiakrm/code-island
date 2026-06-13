@@ -8,6 +8,7 @@ struct FinishedView: View {
     let onOpenSettings: () -> Void
     let onToggleExpand: (Bool) -> Void
 
+    @Environment(\.notchTheme) private var theme
     @State private var isExpanded = false
 
     var body: some View {
@@ -41,21 +42,18 @@ struct FinishedView: View {
             HStack(spacing: 8) {
                 SessionMascot(status: .idle, size: 18, provider: session.provider)
                 Text(session.displayName)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 13, weight: .bold))
                     .foregroundColor(.white)
                 HStack(spacing: 4) {
                     Image(systemName: "checkmark")
                         .font(.system(size: 9, weight: .bold))
                     Text("Finished in \(session.durationText)")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(theme.font(size: 9, weight: .semibold))
                 }
                 .foregroundColor(.green)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(.green.opacity(0.18))
-                )
+                .notchPill(theme, fill: .green.opacity(0.18))
                 Spacer()
                 if let effort = session.effortLevel {
                     EffortBadge(level: effort)
@@ -71,17 +69,14 @@ struct FinishedView: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: 10))
                     Text("Done")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(theme.font(size: 11, weight: .bold))
                 }
                 .foregroundColor(.green)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(.green.opacity(0.15))
-                )
+                .notchPill(theme, fill: .green.opacity(0.15))
                 Text("replied to your message")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(theme.font(size: 11))
                     .foregroundColor(.white.opacity(0.65))
                 Spacer()
             }
@@ -93,28 +88,21 @@ struct FinishedView: View {
                 HStack(spacing: 7) {
                     Image(systemName: "person.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.65))
+                        .foregroundColor(theme.wellForeground.opacity(0.65))
                     Text("you")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.5))
+                        .font(theme.font(size: 9, weight: .bold))
+                        .foregroundColor(theme.wellForeground.opacity(0.5))
                         .kerning(0.5)
                     Text(userMsg)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(theme.font(size: 11))
+                        .foregroundColor(theme.wellForeground.opacity(0.8))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.white.opacity(0.08))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                        )
-                )
+                .notchBox(theme)
                 .padding(.horizontal, 14)
                 .padding(.bottom, 8)
             }
@@ -128,48 +116,48 @@ struct FinishedView: View {
                                 .font(.system(size: 9))
                                 .foregroundColor(.green.opacity(0.7))
                             Text("reply")
-                                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(theme.font(size: 9, weight: .bold))
+                                .foregroundColor(theme.wellForeground.opacity(0.5))
                                 .kerning(0.5)
                         }
                         Spacer()
                         Text(replyMetric(reply))
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.4))
+                            .font(theme.font(size: 9))
+                            .foregroundColor(theme.wellForeground.opacity(0.4))
                         Button(action: {
                             isExpanded.toggle()
                             onToggleExpand(isExpanded)
                         }) {
                             Image(systemName: isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                                 .font(.system(size: 10, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.55))
+                                .foregroundColor(theme.wellForeground.opacity(0.55))
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
-                        UnevenRoundedRectangle(topLeadingRadius: 8, topTrailingRadius: 8)
-                            .fill(.white.opacity(0.08))
+                        UnevenRoundedRectangle(topLeadingRadius: theme.boxRadius, topTrailingRadius: theme.boxRadius)
+                            .fill(theme.boxFill)
                     )
 
                     ScrollView {
                         Text(reply)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.85))
+                            .font(theme.font(size: 11))
+                            .foregroundColor(theme.wellForeground.opacity(0.85))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
                             .padding(10)
                     }
                     .frame(maxHeight: isExpanded ? 400 : 240)
                     .background(
-                        UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8)
-                            .fill(.white.opacity(0.05))
+                        UnevenRoundedRectangle(bottomLeadingRadius: theme.boxRadius, bottomTrailingRadius: theme.boxRadius)
+                            .fill(theme.boxFill)
                     )
                 }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: theme.boxRadius, style: .continuous)
+                        .strokeBorder(theme.boxStroke, lineWidth: 1)
                 )
                 .padding(.horizontal, 14)
             }
@@ -182,19 +170,12 @@ struct FinishedView: View {
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .semibold))
                     Text("Dismiss")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(theme.font(size: 11, weight: .semibold))
                 }
                 .foregroundColor(.green.opacity(0.95))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.green.opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(.green.opacity(0.35), lineWidth: 1)
-                        )
-                )
+                .notchButton(theme, fill: .green.opacity(0.1), stroke: .green.opacity(0.35))
             }
             .buttonStyle(.plain)
             .contentShape(Rectangle())

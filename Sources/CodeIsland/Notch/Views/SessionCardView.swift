@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SessionCardView: View {
+    @Environment(\.notchTheme) private var theme
     let session: Session
     var onDone: (() -> Void)? = nil
 
@@ -17,14 +18,25 @@ struct SessionCardView: View {
         }
     }
 
+    /// The colour the card itself is tinted with. Most themes use the status
+    /// colour; Pixel/Brutalist override the normal thinking/idle states with
+    /// fixed mockup hues (terracotta / sky) but keep error + waiting semantic.
+    private var cardTint: Color {
+        switch session.status {
+        case .thinking, .toolUse: return theme.cardHueActive ?? statusAccent
+        case .idle, .completed:   return theme.cardHueIdle ?? statusAccent
+        case .waitingPermission, .error: return statusAccent
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Row 1: mascot + title + effort + time
             HStack(spacing: 8) {
                 SessionMascot(status: session.status, size: 18, provider: session.provider)
                 Text(session.displayName)
-                    .font(.system(size: 13, weight: .heavy, design: .monospaced))
-                    .foregroundColor(.white)
+                    .font(theme.font(size: 13, weight: .heavy))
+                    .foregroundColor(theme.cardForeground)
                     .lineLimit(1)
                 if let effort = session.effortLevel {
                     EffortBadge(level: effort)
@@ -32,15 +44,15 @@ struct SessionCardView: View {
                 Spacer(minLength: 6)
                 if let model = session.shortModelName {
                     Text(model)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.55))
+                        .font(theme.font(size: 9))
+                        .foregroundColor(theme.cardForeground.opacity(0.55))
                     Text("·")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.25))
+                        .font(theme.font(size: 9))
+                        .foregroundColor(theme.cardForeground.opacity(0.25))
                 }
                 Text(session.durationText)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.45))
+                    .font(theme.font(size: 9))
+                    .foregroundColor(theme.cardForeground.opacity(0.45))
             }
 
             // Row 2: prompt (on its own line for readability)
@@ -48,8 +60,8 @@ struct SessionCardView: View {
             // the entire session and stayed stale after the user sent more.
             if let prompt = session.lastUserMessage ?? session.firstPrompt {
                 Text(prompt)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.7))
+                    .font(theme.font(size: 11))
+                    .foregroundColor(theme.cardForeground.opacity(0.7))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }
@@ -67,11 +79,11 @@ struct SessionCardView: View {
                     if let msg = session.lastUserMessage {
                         HStack(alignment: .top, spacing: 6) {
                             Text("YOU")
-                                .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                                .font(theme.font(size: 9, weight: .heavy))
                                 .foregroundColor(.white.opacity(0.5))
                                 .kerning(1.2)
                             Text(msg)
-                                .font(.system(size: 11, design: .monospaced))
+                                .font(theme.font(size: 11))
                                 .foregroundColor(.white.opacity(0.8))
                                 .lineLimit(1)
                         }
@@ -79,12 +91,12 @@ struct SessionCardView: View {
                     if let resp = session.lastAssistantMessage {
                         HStack(alignment: .top, spacing: 6) {
                             Text(session.provider.displayName.uppercased())
-                                .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                                .font(theme.font(size: 9, weight: .heavy))
                                 .foregroundColor(session.provider.accentColor.opacity(0.85))
                                 .kerning(1.2)
                             ScrollView {
                                 Text(resp)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(theme.font(size: 11))
                                     .foregroundColor(.white.opacity(0.85))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .textSelection(.enabled)
@@ -94,26 +106,22 @@ struct SessionCardView: View {
                     }
                 }
                 .padding(10)
+                // On light-card themes the inset well goes dark so its white
+                // conversation text stays legible; otherwise it's the theme box.
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(.white.opacity(0.05))
+                    RoundedRectangle(cornerRadius: theme.boxRadius, style: .continuous)
+                        .fill(theme.lightCards ? Color.black.opacity(0.82) : theme.boxFill)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: theme.boxRadius, style: .continuous)
+                                .strokeBorder(theme.lightCards ? Color.black : theme.boxStroke,
+                                              lineWidth: theme.strokeWidth)
                         )
                 )
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(statusAccent.opacity(isActive ? 0.05 : 0.03))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(statusAccent.opacity(isActive ? 0.35 : 0.15), lineWidth: 1)
-                )
-        )
+        .notchCard(theme, tint: cardTint, active: isActive)
         .contentShape(Rectangle())
         .onTapGesture {
             TerminalJumper.jump(to: session)
@@ -125,17 +133,17 @@ struct SessionCardView: View {
         HStack(spacing: 5) {
             statusIcon
             Text(statusText)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .font(theme.font(size: 10, weight: .bold))
                 .foregroundColor(statusAccent)
                 .lineLimit(1)
             if isActive, let started = session.activeStartedAt {
                 Text("·")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(theme.font(size: 10))
                     .foregroundColor(.white.opacity(0.3))
                 // TimelineView ticks every 100ms so the elapsed time is live.
                 TimelineView(.periodic(from: .now, by: 0.1)) { ctx in
                     Text(formatElapsed(ctx.date.timeIntervalSince(started)))
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(theme.font(size: 10))
                         .foregroundColor(.white.opacity(0.55))
                         .monospacedDigit()
                 }
@@ -143,10 +151,7 @@ struct SessionCardView: View {
         }
         .padding(.horizontal, 7)
         .padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(statusAccent.opacity(0.15))
-        )
+        .notchPill(theme, fill: theme.chipFill(statusAccent.opacity(0.15)))
     }
 
     private func formatElapsed(_ seconds: TimeInterval) -> String {
@@ -199,15 +204,12 @@ struct SessionCardView: View {
                 .font(.system(size: 9))
                 .foregroundColor(.white.opacity(0.6))
             Text(session.detectedTerminalApp)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(theme.font(size: 9, weight: .semibold))
                 .foregroundColor(.white.opacity(0.75))
         }
         .padding(.horizontal, 5)
         .padding(.vertical, 2)
-        .background(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(.white.opacity(0.06))
-        )
+        .notchPill(theme, fill: theme.chipFill(.white.opacity(0.06)))
     }
 }
 
@@ -232,23 +234,22 @@ struct AnimatedSparkle: View {
 }
 
 struct BadgePill: View {
+    @Environment(\.notchTheme) private var theme
     let text: String
     let color: Color
 
     var body: some View {
         Text(text)
-            .font(.system(size: 9, weight: .medium, design: .monospaced))
+            .font(theme.font(size: 9, weight: .medium))
             .foregroundColor(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(color.opacity(0.15))
-            )
+            .notchPill(theme, fill: theme.chipFill(color.opacity(0.15)))
     }
 }
 
 struct EffortBadge: View {
+    @Environment(\.notchTheme) private var theme
     let level: String
 
     private var color: Color {
@@ -267,16 +268,13 @@ struct EffortBadge: View {
                 .fill(color)
                 .frame(width: 5, height: 5)
             Text(level.uppercased())
-                .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                .font(theme.font(size: 9, weight: .heavy))
                 .foregroundColor(color)
                 .kerning(0.5)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
-        .background(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(color.opacity(0.15))
-        )
+        .notchPill(theme, fill: theme.chipFill(color.opacity(0.15)))
     }
 }
 

@@ -4,12 +4,13 @@ import AppKit
 // MARK: - Tabs
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, integrations, sound, about
+    case general, appearance, integrations, sound, about
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .general:      return "General"
+        case .appearance:   return "Appearance"
         case .integrations: return "Integrations"
         case .sound:        return "Sound"
         case .about:        return "About"
@@ -19,6 +20,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general:      return "gearshape.fill"
+        case .appearance:   return "paintpalette.fill"
         case .integrations: return "puzzlepiece.extension.fill"
         case .sound:        return "speaker.wave.2.fill"
         case .about:        return "info.circle.fill"
@@ -28,6 +30,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     var accentColor: Color {
         switch self {
         case .general:      return .gray
+        case .appearance:   return .purple
         case .integrations: return .blue
         case .sound:        return .green
         case .about:        return .blue
@@ -39,6 +42,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general:
             return "Launch behavior, notch expansion, and update preferences."
+        case .appearance:
+            return "Pick the visual theme for the notch windows."
         case .integrations:
             return "Auto-install hooks for Claude Code and OpenAI Codex."
         case .sound:
@@ -56,7 +61,7 @@ struct SettingsView: View {
 
     @State private var selection: SettingsSection = .general
 
-    /// "v1.1.6" when bundled normally; "dev" when run from `swift run` /
+    /// "v1.2.0" when bundled normally; "dev" when run from `swift run` /
     /// `.build/debug/CodeIsland` (no Info.plist version baked in).
     private var displayVersion: String {
         let v = updateChecker.currentVersion
@@ -259,6 +264,7 @@ struct SettingsView: View {
 
             switch selection {
             case .general:      generalForm
+            case .appearance:   appearanceForm
             case .integrations: integrationsForm
             case .sound:        soundForm
             case .about:        aboutForm
@@ -327,6 +333,35 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Appearance
+
+    @ViewBuilder
+    private var appearanceForm: some View {
+        Section {
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 12),
+                          GridItem(.flexible(), spacing: 12)],
+                spacing: 12
+            ) {
+                ForEach(NotchThemeID.allCases) { id in
+                    ThemePreviewCard(
+                        theme: id.theme,
+                        title: id.displayName,
+                        selected: settingsStore.notchThemeID == id,
+                        action: { settingsStore.notchThemeID = id }
+                    )
+                }
+            }
+            .padding(.vertical, 6)
+        } header: {
+            Text("Theme")
+        } footer: {
+            Text(settingsStore.notchThemeID.blurb)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
         }
     }
 
@@ -474,6 +509,67 @@ private struct IntegrationRow: View {
             Button("Reinstall hooks", action: install)
                 .controlSize(.small)
         }
+    }
+}
+
+/// A selectable theme swatch — renders a mini notch window using the theme's
+/// real chrome tokens so the picker doubles as a live preview.
+private struct ThemePreviewCard: View {
+    let theme: NotchTheme
+    let title: String
+    let selected: Bool
+    let action: () -> Void
+
+    private var swatchBackground: Color {
+        switch theme.windowFill {
+        case .solid(let color):  return color
+        case .material:          return Color(red: 0.13, green: 0.13, blue: 0.16)
+        }
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack {
+                    swatchBackground
+                    // Mini session card built from the theme's own tokens.
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(Color.cyan)
+                            .frame(width: 6, height: 6)
+                        Text("code-island")
+                            .font(theme.font(size: 9, weight: .semibold))
+                            .foregroundColor(theme.cardForeground.opacity(0.9))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 7)
+                    .notchCard(theme, tint: theme.cardHueActive ?? .cyan, active: true)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 13)
+                }
+                .frame(height: 66)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.12),
+                                      lineWidth: selected ? 2 : 1)
+                )
+
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.primary)
+                    Spacer(minLength: 0)
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 13))
+                        .foregroundColor(selected ? .accentColor : .secondary.opacity(0.4))
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

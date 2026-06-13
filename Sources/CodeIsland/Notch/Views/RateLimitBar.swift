@@ -12,6 +12,7 @@ struct RateLimitBar: View {
     /// to the next provider. Used in SessionListView to let users flip
     /// between Claude / Codex rate limits without touching the filter chips.
     var onTap: (() -> Void)? = nil
+    @Environment(\.notchTheme) private var theme
 
     var body: some View {
         let snapshot = rateLimitStore.snapshot(for: provider)
@@ -21,31 +22,31 @@ struct RateLimitBar: View {
 
             if let fh = snapshot.fiveHour {
                 Text("5h")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 10, weight: .bold))
                     .foregroundColor(.white.opacity(0.5))
                 Text("\(fh.usedPercentage)%")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 10, weight: .bold))
                     .foregroundColor(colorForPct(fh.usedPercentage))
                 Text(fh.timeRemaining)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(theme.font(size: 10))
                     .foregroundColor(.white.opacity(0.4))
             }
 
             if snapshot.fiveHour != nil && snapshot.sevenDay != nil {
                 Text("|")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(theme.font(size: 10))
                     .foregroundColor(.white.opacity(0.2))
             }
 
             if let sd = snapshot.sevenDay {
                 Text("7d")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 10, weight: .bold))
                     .foregroundColor(.white.opacity(0.5))
                 Text("\(sd.usedPercentage)%")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 10, weight: .bold))
                     .foregroundColor(colorForPct(sd.usedPercentage))
                 Text(sd.timeRemaining)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(theme.font(size: 10))
                     .foregroundColor(.white.opacity(0.4))
             }
 
@@ -53,7 +54,7 @@ struct RateLimitBar: View {
             // compact hint instead of an empty row so users know why it's blank.
             if snapshot.fiveHour == nil && snapshot.sevenDay == nil {
                 Text(snapshot.error ?? "—")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(theme.font(size: 9))
                     .foregroundColor(.white.opacity(0.35))
             }
         }

@@ -12,6 +12,8 @@ struct QuestionView: View {
     @ObservedObject var settingsStore: SettingsStore
     let onOpenSettings: () -> Void
 
+    @Environment(\.notchTheme) private var theme
+
     @State private var selections: [String: Set<String>] = [:]
     @State private var customAnswers: [String: String] = [:]
     @State private var showWarning = false
@@ -50,21 +52,18 @@ struct QuestionView: View {
             HStack(spacing: 8) {
                 SessionMascot(status: .waitingPermission, size: 18, provider: session.provider)
                 Text(session.displayName)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 13, weight: .bold))
                     .foregroundColor(.white)
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                         .font(.system(size: 9))
                     Text("Waiting for answer")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(theme.font(size: 9, weight: .semibold))
                 }
                 .foregroundColor(.pink)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(.pink.opacity(0.15))
-                )
+                .notchPill(theme, fill: .pink.opacity(0.15))
                 Spacer()
             }
             .padding(.horizontal, 14)
@@ -91,7 +90,7 @@ struct QuestionView: View {
                             .font(.system(size: 10))
                             .foregroundColor(.orange)
                         Text("Pick an option or type a custom answer")
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(theme.font(size: 10))
                             .foregroundColor(.orange)
                     }
                 }
@@ -107,15 +106,12 @@ struct QuestionView: View {
                             Image(systemName: "arrow.up.right.square.fill")
                                 .font(.system(size: 12))
                             Text("Open Codex to answer")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .font(theme.font(size: 12, weight: .bold))
                         }
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color.cyan)
-                        )
+                        .notchButton(theme, fill: Color.cyan)
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -125,19 +121,12 @@ struct QuestionView: View {
                                 Image(systemName: "terminal")
                                     .font(.system(size: 12))
                                 Text("Answer in terminal")
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .font(theme.font(size: 11, weight: .semibold))
                             }
                             .foregroundColor(.white.opacity(0.8))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(.white.opacity(0.06))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .strokeBorder(.white.opacity(0.18), lineWidth: 1)
-                                    )
-                            )
+                            .notchButton(theme, fill: .white.opacity(0.06), stroke: .white.opacity(0.18))
                         }
                         .buttonStyle(.plain)
 
@@ -146,15 +135,12 @@ struct QuestionView: View {
                                 Image(systemName: "paperplane.fill")
                                     .font(.system(size: 11))
                                 Text("Submit Answer")
-                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .font(theme.font(size: 12, weight: .bold))
                             }
                             .foregroundColor(hasAnyAnswer ? .black : .white.opacity(0.4))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(hasAnyAnswer ? Color.cyan : Color.white.opacity(0.06))
-                            )
+                            .notchButton(theme, fill: hasAnyAnswer ? Color.cyan : Color.white.opacity(0.06))
                         }
                         .buttonStyle(.plain)
                     }
@@ -171,27 +157,24 @@ struct QuestionView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Question text
             Text(q.question)
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .font(theme.font(size: 14, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(3)
 
             // Counter chip
             HStack(spacing: 5) {
                 Text("\(index + 1) / \(question.questions.count)")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 9, weight: .bold))
                     .foregroundColor(.white.opacity(0.55))
                 Text("·")
                     .foregroundColor(.white.opacity(0.2))
                 Text(q.multiSelect ? "multi select" : "single select")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(theme.font(size: 9))
                     .foregroundColor(.white.opacity(0.5))
             }
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(.white.opacity(0.05))
-            )
+            .notchPill(theme, fill: .white.opacity(0.05))
 
             // Option pills
             FlowLayout(spacing: 6) {
@@ -207,19 +190,12 @@ struct QuestionView: View {
                                     .font(.system(size: 9, weight: .bold))
                             }
                             Text(option.label)
-                                .font(.system(size: 11, weight: isSelected ? .bold : .regular, design: .monospaced))
+                                .font(theme.font(size: 11, weight: isSelected ? .bold : .regular))
                         }
                         .foregroundColor(isSelected ? .cyan : .white.opacity(0.8))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(isSelected ? Color.cyan.opacity(0.12) : Color.white.opacity(0.06))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .strokeBorder(isSelected ? Color.cyan.opacity(0.7) : Color.white.opacity(0.12), lineWidth: 1)
-                                )
-                        )
+                        .notchPill(theme, fill: isSelected ? Color.cyan.opacity(0.12) : Color.white.opacity(0.06), stroke: isSelected ? Color.cyan.opacity(0.7) : Color.white.opacity(0.12), base: 20)
                     }
                     .buttonStyle(.plain)
                 }
@@ -231,7 +207,7 @@ struct QuestionView: View {
                     .fill(.white.opacity(0.12))
                     .frame(height: 1)
                 Text("or type your own")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(theme.font(size: 9))
                     .foregroundColor(.white.opacity(0.4))
                     .kerning(0.3)
                 Rectangle()
@@ -243,28 +219,21 @@ struct QuestionView: View {
             // Text input
             HStack(spacing: 8) {
                 Text("›")
-                    .font(.system(size: 14, weight: .heavy, design: .monospaced))
+                    .font(theme.font(size: 14, weight: .heavy))
                     .foregroundColor(.cyan.opacity(0.7))
                 TextField("", text: Binding(
                     get: { customAnswers[q.id] ?? "" },
                     set: { customAnswers[q.id] = $0; showWarning = false }
-                ), prompt: Text("Type a custom answer...").foregroundColor(.white.opacity(0.3)))
+                ), prompt: Text("Type a custom answer...").foregroundColor(theme.wellForeground.opacity(0.3)))
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(.white)
+                    .font(theme.font(size: 12))
+                    .foregroundColor(theme.wellForeground)
                     .focused($inputFocused)
                     .onSubmit { submit() }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(.white.opacity(0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(.white.opacity(0.15), lineWidth: 1)
-                    )
-            )
+            .notchBox(theme)
         }
     }
 

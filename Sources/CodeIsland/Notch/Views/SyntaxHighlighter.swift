@@ -25,6 +25,19 @@ enum SyntaxHighlighter {
             diffMinus: Color(red: 1.0, green: 0.55, blue: 0.55),     // light red
             lineNumber: .white.opacity(0.3)
         )
+
+        /// Dark-on-light palette for themes with cream wells (Brutalist).
+        static let light = Theme(
+            plain: Color(red: 0.12, green: 0.12, blue: 0.13),
+            keyword: Color(red: 0.72, green: 0.12, blue: 0.35),      // deep magenta
+            type: Color(red: 0.50, green: 0.36, blue: 0.0),          // dark amber
+            string: Color(red: 0.55, green: 0.25, blue: 0.08),       // burnt orange
+            number: Color(red: 0.10, green: 0.30, blue: 0.66),       // navy
+            comment: .black.opacity(0.4),
+            diffPlus: Color(red: 0.08, green: 0.45, blue: 0.18),     // forest green
+            diffMinus: Color(red: 0.66, green: 0.12, blue: 0.12),    // dark red
+            lineNumber: .black.opacity(0.35)
+        )
     }
 
     /// Common keywords across Swift, JS, Python, Go, etc.

@@ -7,6 +7,8 @@ struct SessionListView: View {
     let onCollapse: () -> Void
     let onOpenSettings: () -> Void
 
+    @Environment(\.notchTheme) private var theme
+
     /// nil = "ALL"; otherwise filter to a single provider.
     @State private var selectedProvider: AIProvider? = nil
     /// Provider ids that the user has collapsed — their cards are hidden
@@ -111,10 +113,10 @@ struct SessionListView: View {
                         .font(.system(size: 28))
                         .foregroundColor(.white.opacity(0.3))
                     Text("No active sessions")
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(theme.font(size: 12))
                         .foregroundColor(.white.opacity(0.4))
                     Text("Start Claude Code to begin")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(theme.font(size: 11))
                         .foregroundColor(.white.opacity(0.3))
                 }
                 Spacer()
@@ -167,7 +169,7 @@ struct SessionListView: View {
 
                 Button(action: onCollapse) {
                     Text("Show all \(sessionStore.sessions.count) sessions")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(theme.font(size: 11))
                         .foregroundColor(.white.opacity(0.4))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -190,23 +192,16 @@ struct SessionListView: View {
                         .frame(width: 6, height: 6)
                 }
                 Text(label)
-                    .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                    .font(theme.font(size: 10, weight: .heavy))
                     .foregroundColor(isSelected ? color : color.opacity(0.55))
                     .kerning(0.8)
                 Text("\(count)")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(theme.font(size: 9, weight: .bold))
                     .foregroundColor(isSelected ? color.opacity(0.85) : color.opacity(0.4))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isSelected ? color.opacity(0.14) : color.opacity(0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(isSelected ? color.opacity(0.4) : .clear, lineWidth: 1)
-                    )
-            )
+            .notchPill(theme, fill: isSelected ? color.opacity(0.14) : color.opacity(0.05), stroke: isSelected ? color.opacity(0.4) : nil, base: 6)
         }
         .buttonStyle(.plain)
     }
@@ -216,11 +211,11 @@ struct SessionListView: View {
         HStack(spacing: 8) {
             ProviderIcon(provider: provider, size: 14)
             Text(provider.displayName.uppercased())
-                .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                .font(theme.font(size: 9, weight: .heavy))
                 .foregroundColor(provider.accentColor.opacity(0.85))
                 .kerning(1.2)
             Text("(\(count))")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .font(theme.font(size: 9, weight: .bold))
                 .foregroundColor(.white.opacity(0.4))
             Rectangle()
                 .fill(.white.opacity(0.08))

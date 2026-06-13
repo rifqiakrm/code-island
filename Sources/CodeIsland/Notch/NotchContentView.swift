@@ -8,9 +8,12 @@ struct NotchContentView: View {
     let onPermissionRespond: (String, PermissionAction) -> Void
     let onOpenSettings: () -> Void
 
+    private var theme: NotchTheme { settingsStore.notchThemeID.theme }
+
     var body: some View {
         ZStack {
             NotchBackground(
+                theme: theme,
                 isExpanded: viewModel.isExpanded,
                 cornerRadius: viewModel.isExpanded ? 20 : 17
             )
@@ -20,6 +23,7 @@ struct NotchContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(NotchShape(cornerRadius: viewModel.isExpanded ? 20 : 14))
+        .environment(\.notchTheme, theme)
         .onHover { hovering in
             if hovering {
                 viewModel.mouseEntered()

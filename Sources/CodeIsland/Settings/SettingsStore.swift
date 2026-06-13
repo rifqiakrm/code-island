@@ -22,6 +22,11 @@ final class SettingsStore: ObservableObject {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding") }
     }
 
+    /// Selected visual theme for the notch windows. Persisted by raw value.
+    @Published var notchThemeID: NotchThemeID {
+        didSet { UserDefaults.standard.set(notchThemeID.rawValue, forKey: "notchThemeID") }
+    }
+
     // Per-sound toggles
     @Published var soundSessionStart: Bool {
         didSet { UserDefaults.standard.set(soundSessionStart, forKey: "soundSessionStart") }
@@ -54,6 +59,7 @@ final class SettingsStore: ObservableObject {
             "soundToolUse": false,
             "soundError": true,
             "soundPermission": true,
+            "notchThemeID": NotchThemeID.default.rawValue,
         ])
 
         self.soundEnabled = defaults.bool(forKey: "soundEnabled")
@@ -66,6 +72,7 @@ final class SettingsStore: ObservableObject {
         self.soundToolUse = defaults.bool(forKey: "soundToolUse")
         self.soundError = defaults.bool(forKey: "soundError")
         self.soundPermission = defaults.bool(forKey: "soundPermission")
+        self.notchThemeID = NotchThemeID(rawValue: defaults.string(forKey: "notchThemeID") ?? "") ?? .default
     }
 
     private func updateLoginItem() {
