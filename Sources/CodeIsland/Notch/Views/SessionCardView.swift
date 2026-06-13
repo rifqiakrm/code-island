@@ -209,7 +209,7 @@ struct SessionCardView: View {
         }
         .padding(.horizontal, 5)
         .padding(.vertical, 2)
-        .notchPill(theme, fill: theme.chipFill(.white.opacity(0.06)))
+        .notchPill(theme, fill: theme.chipFill(.white.opacity(0.06)), base: 4)
     }
 }
 
@@ -244,7 +244,7 @@ struct BadgePill: View {
             .foregroundColor(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .notchPill(theme, fill: theme.chipFill(color.opacity(0.15)))
+            .notchPill(theme, fill: theme.chipFill(color.opacity(0.15)), base: 4)
     }
 }
 
@@ -274,7 +274,7 @@ struct EffortBadge: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
-        .notchPill(theme, fill: theme.chipFill(color.opacity(0.15)))
+        .notchPill(theme, fill: theme.chipFill(color.opacity(0.15)), base: 4)
     }
 }
 

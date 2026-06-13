@@ -163,19 +163,6 @@ struct SessionListView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                 }
-
-                Divider()
-                    .background(Color.white.opacity(0.1))
-
-                Button(action: onCollapse) {
-                    Text("Show all \(sessionStore.sessions.count) sessions")
-                        .font(theme.font(size: 11))
-                        .foregroundColor(.white.opacity(0.4))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
