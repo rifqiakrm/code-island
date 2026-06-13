@@ -166,6 +166,7 @@ See [CLAUDE.md](CLAUDE.md) for the full provider-abstraction notes.
 
 **Other ideas**
 
+- Per-provider rate limits — today the live rate-limit bar only covers Claude and Codex (their usage APIs). Wiring up the other providers' usage/quota endpoints (where they exist) is wide open
 - In-notch permission ("review every action") support for more of the blanket-hook tools
 - Session history view
 - Multi-display notch support
