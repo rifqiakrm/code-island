@@ -162,7 +162,7 @@ PRs welcome! Code Island already ships 17 agents (see [Supported Tools](#support
 
 See [CLAUDE.md](CLAUDE.md) for the full provider-abstraction notes.
 
-**Test & verify the agents.** This is the single most useful thing you can do. Each integration is verified against the tool's official hook docs, but I only use a handful of these agents day-to-day — so I've thoroughly exercised some and only smoke-tested others. If you actively use one of the 17, please put it through its paces (sessions, tool tracking, prompt/reply text, permission/strict-approval flows, jump-to) and open an issue when something's off or could be richer. Real-world reports on the agents I can't run regularly are gold.
+**Test & verify the agents.** This is the single most useful thing you can do. Each integration is verified against the tool's official hook docs, but I only use **Claude Code, Codex, and Qwen** day-to-day — those three are battle-tested; the other 14 are verified against docs but only lightly smoke-tested. If you actively use any of them, please put it through its paces (sessions, tool tracking, prompt/reply text, permission/strict-approval flows, jump-to) and open an issue when something's off or could be richer. Real-world reports on the agents I can't run regularly are gold.
 
 **Other ideas**
 
