@@ -296,12 +296,17 @@ final class SessionStore: ObservableObject {
             sessions[sessionId]?.currentTool = toolName
             onEvent.send(.toolStarted(sessionId, toolName))
 
-            // Codex's AskUserQuestion equivalent — fires through PreToolUse, not
-            // PermissionRequest. We can't reply via the hook (Codex PreToolUse
-            // only supports allow/deny, not substituting an answer), so we
-            // mirror the question in the notch and route any click to the app.
-            if (message.source ?? "claude") == "codex",
-               toolName == "request_user_input",
+            // Codex's `request_user_input` and Hermes' `clarify` are their
+            // AskUserQuestion equivalents — they fire through PreToolUse, not
+            // PermissionRequest, and the hook can't substitute an answer. So we
+            // mirror the question in the notch and route any click to the app/
+            // terminal where the user actually answers. (The Hermes bridge has
+            // already reshaped clarify's {question,choices} into the canonical
+            // questions JSON.) PostToolUse dismisses it once they've answered.
+            let src = message.source ?? "claude"
+            let isMirroredQuestion = (src == "codex" && toolName == "request_user_input")
+                || (src == "hermes" && toolName == "clarify")
+            if isMirroredQuestion,
                let desc = message.toolInput,
                let parsedQuestions = Self.parseQuestion(desc) {
                 sessions[sessionId]?.status = .waitingPermission

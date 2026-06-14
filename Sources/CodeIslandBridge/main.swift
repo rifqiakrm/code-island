@@ -261,6 +261,21 @@ if toolInputStr == nil, let topCommand = payload["command"] as? String {
 if toolInputStr == nil, let cl = agArgs?["CommandLine"] as? String {
     toolInputStr = cl
 }
+// Hermes' `clarify` tool is its AskUserQuestion equivalent — tool_input is
+// {question, choices[]}. Reshape into the canonical {questions:[…]} so the
+// app's question mirror (the same path Codex's request_user_input uses) renders
+// it, with a jump-to-terminal to answer (the hook can't inject the choice).
+if providerSource == "hermes", toolName == "clarify",
+   let ti = payload["tool_input"] as? [String: Any],
+   let q = ti["question"] as? String {
+    let options: [[String: Any]] = ((ti["choices"] as? [String]) ?? []).map { ["label": $0] }
+    let canonical: [String: Any] = ["questions": [[
+        "question": q, "header": "Clarify", "options": options, "multiSelect": false,
+    ]]]
+    if let d = try? JSONSerialization.data(withJSONObject: canonical) {
+        toolInputStr = String(data: d, encoding: .utf8)
+    }
+}
 
 // Collect terminal env vars for jump support
 var envVars: [String: String] = [:]
