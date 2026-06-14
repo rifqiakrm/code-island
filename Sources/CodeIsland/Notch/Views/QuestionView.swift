@@ -95,17 +95,17 @@ struct QuestionView: View {
                     }
                 }
 
-                // For Codex, hook-side answer substitution isn't supported
-                // — the only way to actually answer is in Codex.app. Hide
-                // the Submit button (which would silently discard the
-                // user's answer — issue #25) and relabel the defer button
-                // to make the intent clear.
-                if session.source == "codex" {
+                // For Codex and Hermes, hook-side answer substitution isn't
+                // supported — the only way to actually answer is in the agent's
+                // own terminal/app. Hide the Submit button (which would silently
+                // discard the user's answer — issue #25) and relabel the defer
+                // button to make the intent clear.
+                if session.source == "codex" || session.source == "hermes" {
                     Button(action: onDeferToTerminal) {
                         HStack(spacing: 7) {
                             Image(systemName: "arrow.up.right.square.fill")
                                 .font(.system(size: 12))
-                            Text("Open Codex to answer")
+                            Text("Open \(session.provider.displayName) to answer")
                                 .font(theme.font(size: 12, weight: .bold))
                         }
                         .foregroundColor(.black)
