@@ -36,8 +36,45 @@ do {
 let inputData = FileHandle.standardInput.readDataToEndOfFile()
 guard !inputData.isEmpty else { exit(1) }
 
-// Parse the hook payload from Claude Code
-guard let payload = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any] else {
+/// Some agents (notably Hermes) emit JSON with RAW control characters — literal
+/// newlines/tabs inside string values (e.g. a multi-line assistant_response or a
+/// growing conversation_history) that they fail to escape. That makes the whole
+/// payload invalid JSON, so the event is dropped and the session hangs (e.g.
+/// "infinite thinking" because the Stop never arrives). Re-escape control bytes
+/// that occur *inside strings*; structural whitespace between tokens is untouched.
+func sanitizeControlChars(_ data: Data) -> Data {
+    var out = [UInt8](); out.reserveCapacity(data.count + 16)
+    var inString = false, escaped = false
+    for b in data {
+        if escaped { out.append(b); escaped = false; continue }
+        if inString {
+            switch b {
+            case 0x5C: out.append(b); escaped = true            // backslash → next byte is literal
+            case 0x22: out.append(b); inString = false          // closing quote
+            case 0x08: out.append(contentsOf: [0x5C, 0x62])     // \b
+            case 0x09: out.append(contentsOf: [0x5C, 0x74])     // \t
+            case 0x0A: out.append(contentsOf: [0x5C, 0x6E])     // \n
+            case 0x0C: out.append(contentsOf: [0x5C, 0x66])     // \f
+            case 0x0D: out.append(contentsOf: [0x5C, 0x72])     // \r
+            case 0x00...0x1F: out.append(contentsOf: Array(String(format: "\\u%04x", b).utf8))
+            default: out.append(b)
+            }
+        } else {
+            if b == 0x22 { inString = true }
+            out.append(b)
+        }
+    }
+    return Data(out)
+}
+
+// Parse the hook payload. Fall back to a control-char sanitize pass for agents
+// that emit raw newlines inside JSON strings.
+let payload: [String: Any]
+if let p = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any] {
+    payload = p
+} else if let p = try? JSONSerialization.jsonObject(with: sanitizeControlChars(inputData)) as? [String: Any] {
+    payload = p
+} else {
     fputs("code-island-bridge: invalid JSON on stdin\n", stderr)
     exit(1)
 }
@@ -93,13 +130,15 @@ let eventNormalization: [String: [String: String]] = [
     // Pi / Oh My Pi extensions emit canonical names already; just drop PostCompact.
     "pi":  ["PostCompact": "skip"],
     "omp": ["PostCompact": "skip"],
-    // Nous Research Hermes (config.yaml hooks). on_session_start/on_session_end
-    // bracket each TURN (not the CLI lifetime), so map them to the turn cycle —
-    // start→UserPromptSubmit (thinking), end→Stop (finished, card STAYS). Using
-    // SessionEnd here would delete the card after every prompt. Real CLI exit is
-    // handled by the PID sweep (Hermes' hook parent is the long-lived process).
+    // Nous Research Hermes (config.yaml hooks). The TURN cycle is driven by the
+    // LLM-call events: pre_llm_call carries `user_message` (prompt → thinking),
+    // post_llm_call carries `assistant_response` (reply → finished, card STAYS).
+    // on_session_start just creates the card; on_session_end is ignored (the PID
+    // sweep handles real teardown — mapping it to SessionEnd deleted the card
+    // every turn). subagent_stop tracks delegations.
     "hermes": [
-        "on_session_start": "UserPromptSubmit", "on_session_end": "Stop",
+        "on_session_start": "SessionStart", "on_session_end": "skip",
+        "pre_llm_call": "UserPromptSubmit", "post_llm_call": "Stop",
         "pre_tool_call": "PreToolUse", "post_tool_call": "PostToolUse",
         "subagent_stop": "SubagentStop",
     ],
@@ -279,10 +318,15 @@ let userMessage: String? = {
         if providerSource == "antigravity", let p = agTranscriptPath {
             return agUserRequestFromTranscript(p)
         }
+        // Hermes' pre_llm_call carries the prompt as `user_message`, possibly
+        // nested under `extra` — check both.
+        let hermesExtra = payload["extra"] as? [String: Any]
         // Claude uses "prompt"; Cursor/others vary.
         return payload["prompt"] as? String ?? payload["query"] as? String
             ?? payload["user_prompt"] as? String ?? payload["message"] as? String
             ?? payload["input"] as? String ?? payload["text"] as? String
+            ?? payload["user_message"] as? String              // Hermes (top-level)
+            ?? hermesExtra?["user_message"] as? String          // Hermes (in extra)
     }
     return nil
 }()
@@ -293,10 +337,15 @@ let assistantMessage: String? = {
         if providerSource == "antigravity", let p = agTranscriptPath {
             return agAssistantFromTranscript(p)
         }
+        // Hermes' post_llm_call carries the reply as `assistant_response`,
+        // possibly nested under `extra` — check both.
+        let hermesExtra = payload["extra"] as? [String: Any]
         // Cursor's afterAgentResponse carries the reply in "text"/"message";
         // Gemini's AfterAgent uses "prompt_response".
         return payload["last_assistant_message"] as? String
             ?? payload["prompt_response"] as? String
+            ?? payload["assistant_response"] as? String          // Hermes (top-level)
+            ?? hermesExtra?["assistant_response"] as? String      // Hermes (in extra)
             ?? payload["text"] as? String ?? payload["message"] as? String
     }
     return nil

@@ -173,7 +173,8 @@ enum ProviderInstaller {
         Descriptor(source: "hermes", displayName: "Hermes",
                    configDirRel: ".hermes", configFileRel: "config.yaml",
                    format: .hermesYAML, timeoutUnit: .seconds, createDirIfMissing: false,
-                   events: [("on_session_start", 5), ("on_session_end", 5),
+                   events: [("on_session_start", 5),
+                            ("pre_llm_call", 5), ("post_llm_call", 5),
                             ("pre_tool_call", 5), ("post_tool_call", 5), ("subagent_stop", 5)]),
     ]
 
