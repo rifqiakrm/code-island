@@ -890,6 +890,35 @@ body.record > *:not(#record-stage) { display: none !important; }
 }
 #record-stage .rec-cap b { color: var(--accent-2); font-weight: 700; }
 
+/* ===== CINEMATIC MODE (?cine) — Apple-style headlines + title cards ===== */
+body.cine #record-stage .rec-wordmark,
+body.cine #record-stage .rec-cap { display: none; }
+body.cine #record-stage .notch-shape { transition: width 0.6s cubic-bezier(0.34,1.2,0.4,1), height 0.6s cubic-bezier(0.34,1.2,0.4,1), border-radius 0.6s ease, opacity 0.7s ease; }
+#record-stage .cine-headline {
+  position: absolute; left: 7%; right: 7%; bottom: 17%; z-index: 3; text-align: center;
+  font-family: 'Inter', sans-serif; font-weight: 600; color: #fff;
+  font-size: 50px; line-height: 1.12; letter-spacing: -0.025em;
+  text-shadow: 0 4px 34px rgba(0,0,0,0.6); opacity: 0; pointer-events: none;
+}
+#record-stage .cine-headline.in { animation: cineRise 0.95s cubic-bezier(0.16,0.8,0.3,1) forwards; }
+@keyframes cineRise { from { opacity: 0; transform: translateY(26px); filter: blur(3px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+#record-stage .cine-headline .cine-sub {
+  display: block; margin-top: 14px; font-family: 'JetBrains Mono', monospace;
+  font-weight: 400; font-size: 19px; letter-spacing: 0; color: rgba(255,255,255,0.6);
+}
+#record-stage .cine-card {
+  position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 0 8%;
+  background: radial-gradient(75% 55% at 50% 45%, rgba(22,14,46,0.55), #05030f 82%);
+  opacity: 0; transition: opacity 0.7s ease; pointer-events: none;
+}
+#record-stage .cine-card.show { opacity: 1; }
+#record-stage .cine-card img { width: 88px; height: 88px; margin-bottom: 10px; filter: drop-shadow(0 8px 26px rgba(0,0,0,0.55)); animation: cinePop 1.1s cubic-bezier(0.16,0.8,0.3,1) both; }
+#record-stage .cine-card .ct { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 64px; color: #fff; letter-spacing: -0.035em; animation: cineRise 1s 0.15s cubic-bezier(0.16,0.8,0.3,1) both; }
+#record-stage .cine-card .cs { font-family: 'JetBrains Mono', monospace; font-size: 21px; color: rgba(255,255,255,0.68); animation: cineRise 1s 0.32s cubic-bezier(0.16,0.8,0.3,1) both; }
+#record-stage .cine-card .cu { font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--accent-2); margin-top: 14px; animation: cineRise 1s 0.5s cubic-bezier(0.16,0.8,0.3,1) both; }
+@keyframes cinePop { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+
 /* ===== SHOWCASE PANELS (themes / mascots / jump-to / sound) ===== */
 .state-themes, .state-mascots, .state-jumpto, .state-sound {
   font-family: 'JetBrains Mono', monospace;

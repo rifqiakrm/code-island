@@ -804,6 +804,7 @@ swift build -c release
 
       const params = new URLSearchParams(location.search);
       const short = params.has('short');     // ?short → ~20s highlight cut
+      const cine = params.has('cine');       // ?cine  → Apple-style headlines + cards
       const themeInterval = short ? 1100 : 1500;
 
       // Full reel (~40s, all 8 states) vs short highlight cut (~22s, the most
@@ -838,7 +839,20 @@ swift build -c release
         { state: 'idle',     label: 'Idle',       hold: 500  },
         { state: 'jumpto',   label: 'Jump-to',    hold: 3200 },
       ];
-      const seq = short ? shortSeq : fullSeq;
+      // Cinematic cut — fewer scenes, longer dwell, a headline per beat, plus
+      // intro/outro title cards. `head` may contain a <span class="cine-sub">.
+      const cineSeq = [
+        { card: 'intro',                                                hold: 3200 },
+        { state: 'list',     head: 'Every session.<br>One glance.',     hold: 3800 },
+        { state: 'perm',     head: 'Approve without<br>leaving flow.',  hold: 3800 },
+        { state: 'finished', head: 'Know the moment<br>it ships.',      hold: 3400 },
+        { state: 'themes',   head: 'Five looks.<br>Your vibe.',         hold: 7600 },
+        { state: 'mascots',  head: '17 agents.<br>17 mascots.',         hold: 3900 },
+        { state: 'jumpto',   head: 'One click<br>to your terminal.',    hold: 3800 },
+        { state: 'sound',    head: 'A chirp for<br>every beat.',        hold: 3400 },
+        { card: 'outro',                                                hold: 4200 },
+      ];
+      const seq = cine ? cineSeq : (short ? shortSeq : fullSeq);
 
       // Total loop length (sum of holds) — used by the offline recorder.
       window.__loopMs = seq.reduce((a, s) => a + s.hold, 0);
@@ -870,9 +884,10 @@ swift build -c release
       // moves the live notch into it, so the cycling animation can be captured
       // as a social video with no page chrome.
       const recording = params.has('record');
-      let recCap = null;
+      let recCap = null, cineHead = null, cineCard = null;
       if (recording) {
         document.body.classList.add('record');
+        if (cine) document.body.classList.add('cine');
         const stage = document.createElement('div');
         stage.id = 'record-stage';
         const scale = parseFloat(params.get('scale') || '1.5');
@@ -887,17 +902,44 @@ swift build -c release
         recCap = document.createElement('div');
         recCap.className = 'rec-cap';
         stage.appendChild(recCap);
+        if (cine) {
+          cineHead = document.createElement('div');
+          cineHead.className = 'cine-headline';
+          stage.appendChild(cineHead);
+          cineCard = document.createElement('div');
+          cineCard.className = 'cine-card';
+          stage.appendChild(cineCard);
+        }
         document.body.appendChild(stage);
       }
+
+      const CARDS = {
+        intro: '<img src="assets/logo.png" alt=""/><div class="ct">Code Island</div><div class="cs">your notch, reimagined.</div>',
+        outro: '<img src="assets/logo.png" alt=""/><div class="ct">Code Island</div><div class="cs">17 AI coding agents · one notch</div><div class="cu">free &amp; open source — github.com/rifqiakrm/code-island</div>',
+      };
 
       let i = 0;
       function step() {
         const cur = seq[i];
-        shape.dataset.state = cur.state;
-        shape.style.height = heights[cur.state] + 'px';
-        if (label) label.textContent = cur.label;
-        if (recCap) recCap.innerHTML = cur.state === 'idle' ? '&nbsp;' : '<b>' + cur.label + '</b>';
-        if (cur.state === 'themes') startThemes(); else stopThemes();
+        if (cine && cur.card) {
+          // Title-card beat — fade the notch out, reveal the full-screen card.
+          shape.style.opacity = '0';
+          if (cineHead) cineHead.classList.remove('in');
+          if (cineCard) { cineCard.innerHTML = CARDS[cur.card]; cineCard.classList.add('show'); }
+          if (label) label.textContent = 'Code Island';
+        } else {
+          if (cineCard) cineCard.classList.remove('show');
+          shape.style.opacity = '1';
+          shape.dataset.state = cur.state;
+          shape.style.height = heights[cur.state] + 'px';
+          if (label) label.textContent = cur.label;
+          if (recCap) recCap.innerHTML = cur.state === 'idle' ? '&nbsp;' : '<b>' + cur.label + '</b>';
+          if (cineHead && cur.head) {
+            cineHead.innerHTML = cur.head + (cur.sub ? '<span class="cine-sub">' + cur.sub + '</span>' : '');
+            cineHead.classList.remove('in'); void cineHead.offsetWidth; cineHead.classList.add('in');
+          }
+          if (cur.state === 'themes') startThemes(); else stopThemes();
+        }
         i = (i + 1) % seq.length;
         setTimeout(step, cur.hold);
       }
