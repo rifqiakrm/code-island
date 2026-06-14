@@ -306,6 +306,7 @@ final class SessionStore: ObservableObject {
             let src = message.source ?? "claude"
             let isMirroredQuestion = (src == "codex" && toolName == "request_user_input")
                 || (src == "hermes" && toolName == "clarify")
+                || ((src == "omp" || src == "pi") && toolName == "Ask")
             if isMirroredQuestion,
                let desc = message.toolInput,
                let parsedQuestions = Self.parseQuestion(desc) {
@@ -484,7 +485,8 @@ final class SessionStore: ObservableObject {
         return questions.enumerated().map { qIndex, q in
             let questionText = q["question"] as? String ?? ""
             let header = q["header"] as? String
-            let multiSelect = q["multiSelect"] as? Bool ?? false
+            // Oh My Pi's Ask tool uses `multi`; Claude/Codex use `multiSelect`.
+            let multiSelect = q["multiSelect"] as? Bool ?? q["multi"] as? Bool ?? false
             let options = (q["options"] as? [[String: Any]] ?? []).enumerated().map { oIndex, opt in
                 QuestionOption(
                     id: opt["label"] as? String ?? "q\(qIndex)_o\(oIndex)",

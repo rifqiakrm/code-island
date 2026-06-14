@@ -100,7 +100,8 @@ struct QuestionView: View {
                 // own terminal/app. Hide the Submit button (which would silently
                 // discard the user's answer — issue #25) and relabel the defer
                 // button to make the intent clear.
-                if session.source == "codex" || session.source == "hermes" {
+                if session.source == "codex" || session.source == "hermes"
+                    || session.source == "omp" || session.source == "pi" {
                     Button(action: onDeferToTerminal) {
                         HStack(spacing: 7) {
                             Image(systemName: "arrow.up.right.square.fill")
