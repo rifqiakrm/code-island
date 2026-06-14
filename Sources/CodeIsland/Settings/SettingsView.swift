@@ -515,6 +515,36 @@ struct SettingsView: View {
                 accent: Color(red: 0.00, green: 0.70, blue: 0.49),
                 install: { ProviderInstaller.installSource("cline") }
             )
+            IntegrationRow(
+                title: "Kiro",
+                subtitle: "Writes an agent to ~/.kiro/agents/codeisland.json (launch: kiro --agent codeisland).",
+                accent: Color(red: 0.49, green: 0.36, blue: 1.00),
+                install: { ProviderInstaller.installSource("kiro") }
+            )
+            IntegrationRow(
+                title: "Pi",
+                subtitle: "Installs a TypeScript extension in ~/.pi/agent/extensions.",
+                accent: Color(red: 0.96, green: 0.69, blue: 0.13),
+                install: { ProviderInstaller.installSource("pi") }
+            )
+            IntegrationRow(
+                title: "Oh My Pi",
+                subtitle: "Installs a TypeScript extension in ~/.omp/agent/extensions.",
+                accent: Color(red: 0.13, green: 0.78, blue: 0.74),
+                install: { ProviderInstaller.installSource("omp") }
+            )
+            IntegrationRow(
+                title: "AntiGravity",
+                subtitle: "Writes a hook group to ~/.gemini/config/hooks.json (restart AntiGravity to load).",
+                accent: Color(red: 0.259, green: 0.522, blue: 0.957),
+                install: { ProviderInstaller.installSource("antigravity") }
+            )
+            IntegrationRow(
+                title: "Hermes",
+                subtitle: "Merges hooks into ~/.hermes/config.yaml (needs `hermes hooks` approval).",
+                accent: Color(red: 0.953, green: 0.722, blue: 0.196),
+                install: { ProviderInstaller.installSource("hermes") }
+            )
         } header: {
             Text("Providers")
         } footer: {
