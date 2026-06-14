@@ -45,7 +45,7 @@ final class SettingsStore: ObservableObject {
     /// Providers whose hooks are blanket "before every tool" gates (no native
     /// selective permission event). Strict-approval mode turns those into
     /// blocking in-notch approve/deny prompts — opt-in, per provider.
-    static let strictApprovalProviders = ["gemini", "cursor", "copilot", "kimi", "antigravity"]
+    static let strictApprovalProviders = ["gemini", "cursor", "copilot", "kimi", "antigravity", "hermes"]
 
     /// Per-provider "review every action" flags (default off). Persisted to
     /// UserDefaults AND mirrored to ~/.code-island/config.json so the bridge

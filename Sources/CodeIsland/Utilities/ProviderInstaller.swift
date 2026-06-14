@@ -173,9 +173,11 @@ enum ProviderInstaller {
         Descriptor(source: "hermes", displayName: "Hermes",
                    configDirRel: ".hermes", configFileRel: "config.yaml",
                    format: .hermesYAML, timeoutUnit: .seconds, createDirIfMissing: false,
+                   // pre_tool_call gets a long timeout for the optional
+                   // strict-approval prompt (no-op when strict mode is off).
                    events: [("on_session_start", 5),
                             ("pre_llm_call", 5), ("post_llm_call", 5),
-                            ("pre_tool_call", 5), ("post_tool_call", 5), ("subagent_stop", 5)]),
+                            ("pre_tool_call", 300), ("post_tool_call", 5), ("subagent_stop", 5)]),
     ]
 
     // MARK: - Entry point
@@ -589,6 +591,34 @@ enum ProviderInstaller {
     /// (`hooks: {}`) or already ours — bails on user-authored hooks. Backs up
     /// to .bak. Hermes still requires the user to approve via `hermes hooks`
     /// (or set `hooks_auto_accept`) before the hooks fire.
+    /// Does the existing Hermes `hooks:` block already declare exactly our
+    /// events with matching timeouts, all pointing at our launcher? Tolerates
+    /// Hermes' reformatting (any indent/quote style). Used to skip needless
+    /// rewrites that would otherwise re-trigger Hermes' hook-approval prompt.
+    private static func currentMatchesDesired(_ block: String,
+                                              events: [(String, Int)],
+                                              launcher: String) -> Bool {
+        var found: [String: Int] = [:]      // event → timeout
+        var currentEvent: String?
+        var sawLauncherForEvent = false
+        for raw in block.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            // Event header: "<name>:" at 2-space indent (not a list item / nested key).
+            if raw.hasPrefix("  "), !raw.hasPrefix("   "), line.hasSuffix(":"),
+               !line.contains(" "), line != "hooks:" {
+                currentEvent = String(line.dropLast())
+                sawLauncherForEvent = false
+            } else if line.contains("command:") {
+                sawLauncherForEvent = line.contains(launcher)
+            } else if line.hasPrefix("timeout:"), let ev = currentEvent, sawLauncherForEvent,
+                      let n = Int(line.dropFirst("timeout:".count).trimmingCharacters(in: .whitespaces)) {
+                found[ev] = n
+            }
+        }
+        let desired = Dictionary(events, uniquingKeysWith: { a, _ in a })
+        return found == desired
+    }
+
     private static func installHermesYAML(_ d: Descriptor) -> Bool {
         let fileURL = configDir(d).appendingPathComponent(d.configFileRel)   // ~/.hermes/config.yaml
         guard let existing = try? String(contentsOf: fileURL, encoding: .utf8) else {
@@ -615,9 +645,24 @@ enum ProviderInstaller {
         let current = lines[start..<end].joined(separator: "\n")
         let isEmpty = lines[start].trimmingCharacters(in: .whitespaces) == "hooks: {}"
             || (end == start + 1 && lines[start].trimmingCharacters(in: .whitespaces) == "hooks:")
-        guard isEmpty || current.contains(hermesMarker) else {
+        // Ownership: Hermes RE-SERIALISES config.yaml on save and strips our
+        // marker comment + reformats the block, so we can't rely on the marker
+        // alone. Treat the block as ours if it references our launcher command
+        // (every hook points at code-island-hermes-bridge). Only refuse when the
+        // block is non-empty, has no marker, AND doesn't mention our launcher —
+        // i.e. genuinely foreign hooks.
+        let owned = current.contains(hermesMarker) || current.contains(cmd)
+        guard isEmpty || owned else {
             Log.error("ProviderInstaller(hermes): config.yaml `hooks:` has user content — not overwriting")
             return false
+        }
+        // Avoid rewrite churn: Hermes reformats our block (drops the marker,
+        // changes quoting/indent), so a byte compare always differs and we'd
+        // rewrite every launch — which can re-trigger Hermes' hook-approval
+        // prompt. Skip the write when the block already has exactly our events
+        // with matching timeouts, all pointing at our launcher.
+        if owned, currentMatchesDesired(current, events: d.events, launcher: cmd) {
+            return true
         }
         lines.replaceSubrange(start..<end, with: [ourBlock])
         let newText = lines.joined(separator: "\n")

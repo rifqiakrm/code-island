@@ -314,7 +314,7 @@ struct SettingsView: View {
         } header: {
             Text("Review every action")
         } footer: {
-            Text("Gemini, Cursor, Copilot, Kimi, and AntiGravity have no native permission prompt — only blanket \"before every tool\" hooks. Turn one on to pause that agent on every tool call for in-notch approval. Off by default: when on you'll be prompted a lot, and if you don't answer before the hook times out (~5 min) the action proceeds.")
+            Text("Gemini, Cursor, Copilot, Kimi, AntiGravity, and Hermes have no selective permission prompt — only blanket \"before every tool\" hooks. Turn one on to pause that agent on every tool call for in-notch approval. Off by default: when on you'll be prompted a lot, and if you don't answer before the hook times out (~5 min) the action proceeds. (Hermes also keeps its own prompt for dangerous commands.)")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
         }

@@ -160,6 +160,7 @@ let permissionGateEvents: [String: Set<String>] = [
     "copilot": ["preToolUse"],
     "kimi": ["PreToolUse"],
     "antigravity": ["PreToolUse"],
+    "hermes": ["pre_tool_call"],
 ]
 func strictApprovalEnabled(_ source: String) -> Bool {
     let url = FileManager.default.homeDirectoryForCurrentUser
@@ -169,8 +170,12 @@ func strictApprovalEnabled(_ source: String) -> Bool {
           let map = root["strictApproval"] as? [String: Any] else { return false }
     return (map[source] as? Bool) == true
 }
+// Hermes' `clarify` rides on pre_tool_call but is a question, not a tool to
+// approve — never gate it (it goes through the question-mirror path instead).
+let isClarify = providerSource == "hermes" && (payload["tool_name"] as? String) == "clarify"
 let isStrictGate = (permissionGateEvents[providerSource]?.contains(rawEvent) ?? false)
     && strictApprovalEnabled(providerSource)
+    && !isClarify
 
 let hookEvent = isStrictGate
     ? "PermissionRequest"
@@ -633,6 +638,11 @@ func translateStrictDecision(source: String, appResponse: Data) -> Data {
         if deny { json = "{\"decision\":\"deny\",\"reason\":\"\(reason)\"}" }
         else if ask { json = "{\"decision\":\"ask\"}" }
         else { json = "{\"decision\":\"allow\"}" }
+    case "hermes":
+        // Hermes pre_tool_call blocks on {"decision":"block"}; anything else
+        // (incl. an empty object) lets the tool proceed. No "ask" concept.
+        if deny { json = "{\"decision\":\"block\",\"reason\":\"\(reason)\"}" }
+        else { json = "{}" }
     case "copilot":
         if deny { json = "{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"\(reason)\"}" }
         else if ask { json = "{\"permissionDecision\":\"ask\"}" }
