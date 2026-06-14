@@ -170,8 +170,19 @@ final class MenuBarManager: NSObject, NSMenuDelegate {
     }
 
     @objc private func installHooks() {
+        // Re-run the SAME full set the app installs on launch — Claude, Codex,
+        // and all the descriptor-driven providers. (Previously this only did
+        // Claude + Codex, silently skipping the other 15.)
         _ = HookInstaller.install()
         _ = CodexInstaller.install()
+        _ = ProviderInstaller.installAll()
+
+        let alert = NSAlert()
+        alert.messageText = "Hooks installed"
+        alert.informativeText = "Re-installed hooks for every detected agent. If an agent was already running, restart it to pick them up."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc private func checkForUpdates() {
