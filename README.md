@@ -47,23 +47,23 @@ Code Island auto-installs hooks for every agent it detects on launch — install
 | <img src="docs/mascots/codex.png" width="28"/> | <img src="Resources/cli-icons/codex.png" width="15"/> **Codex** (CLI + app) | full | ✅ | ✅ |
 | <img src="docs/mascots/gemini.png" width="28"/> | <img src="Resources/cli-icons/gemini.png" width="15"/> **Gemini CLI** | 6 | ✅ | — |
 | <img src="docs/mascots/qwen.png" width="28"/> | <img src="Resources/cli-icons/qwen.png" width="15"/> **Qwen Code** | full | ✅ | ✅ |
-| <img src="docs/mascots/qoder.png" width="28"/> | <img src="Resources/cli-icons/qoder.png" width="15"/> **Qoder** | 11 | ✅ | ✅ |
-| <img src="docs/mascots/droid.png" width="28"/> | <img src="Resources/cli-icons/droid.png" width="15"/> **Factory** (`droid`) | 10 | ✅ | — |
+| <img src="docs/mascots/qoder.png" width="28"/> | <img src="Resources/cli-icons/qoder.png" width="15"/> **Qoder** | 5 | ✅ | — |
+| <img src="docs/mascots/droid.png" width="28"/> | <img src="Resources/cli-icons/droid.png" width="15"/> **Factory** (`droid`) | 9 | ✅ | — |
 | <img src="docs/mascots/codebuddy.png" width="28"/> | <img src="Resources/cli-icons/codebuddy.png" width="15"/> **CodeBuddy** | 10 | ✅ | — |
 | <img src="docs/mascots/cursor.png" width="28"/> | <img src="Resources/cli-icons/cursor.png" width="15"/> **Cursor** | 10 | ✅ | — |
-| <img src="docs/mascots/copilot.png" width="28"/> | <img src="Resources/cli-icons/copilot.png" width="15"/> **Copilot** | 6 | ✅ | — |
+| <img src="docs/mascots/copilot.png" width="28"/> | <img src="Resources/cli-icons/copilot.png" width="15"/> **Copilot** | 7 | ✅ | — |
 | <img src="docs/mascots/kimi.png" width="28"/> | <img src="Resources/cli-icons/kimi.png" width="15"/> **Kimi Code CLI** | 10 | ✅ | — |
 | <img src="docs/mascots/opencode.png" width="28"/> | <img src="Resources/cli-icons/opencode.png" width="15"/> **OpenCode** | all | ✅ | ✅ |
-| <img src="docs/mascots/cline.png" width="28"/> | <img src="Resources/cli-icons/cline.png" width="15"/> **Cline** | 8 | ✅ | — |
+| <img src="docs/mascots/cline.png" width="28"/> | <img src="Resources/cli-icons/cline.png" width="15"/> **Cline** | 7 | ✅ | — |
 | <img src="docs/mascots/kiro.png" width="28"/> | <img src="Resources/cli-icons/kiro.png" width="15"/> **Kiro** | 5 | ✅ | — |
 | <img src="docs/mascots/pi.png" width="28"/> | <img src="Resources/cli-icons/pi.png" width="15"/> **Pi** | all | ✅ | ✅ |
 | <img src="docs/mascots/omp.png" width="28"/> | <img src="Resources/cli-icons/omp.png" width="15"/> **Oh My Pi** | all | ✅ | ✅ |
 | <img src="docs/mascots/antigravity.png" width="28"/> | <img src="Resources/cli-icons/antigravity.png" width="15"/> **AntiGravity** | 4 | ✅ | — |
-| <img src="docs/mascots/hermes.png" width="28"/> | <img src="Resources/cli-icons/hermes.png" width="15"/> **Hermes** | 5 | ✅ | — |
+| <img src="docs/mascots/hermes.png" width="28"/> | <img src="Resources/cli-icons/hermes.png" width="15"/> **Hermes** | 6 | ✅ | — |
 
 **Jump-to works for every agent** — there's no per-tool jump config. The bridge tags each session with the host app it detected by walking the process tree, and clicking a card brings you straight there. **iTerm2, Terminal.app, Ghostty, JetBrains IDEs, VS Code, Cursor, and Windsurf** get tab/window-level precision; any other terminal or app is brought to the front.
 
-**Permission / question UI** ✅ marks the agents that surface approve/deny (and questions) directly in the notch — Claude, Codex, Qwen, Qoder, OpenCode, and Pi / Oh My Pi (the last two prompt on risky shell commands). Gemini, Cursor, Copilot, Kimi, and AntiGravity expose only blanket "before every tool" hooks — turn those into prompts with the opt-in **"Review every action"** mode (Settings → General). The rest (Factory, CodeBuddy, Cline, Kiro, Hermes) handle approvals in-tool; Code Island still tracks their sessions, tools, and completions.
+**Permission / question UI** ✅ marks the agents that surface approve/deny (and questions) directly in the notch — Claude, Codex, Qwen, OpenCode, and Pi / Oh My Pi (the last two prompt on risky shell commands). Codex, Hermes, and Oh My Pi also mirror their question prompts in the notch with a jump-to-answer. Gemini, Cursor, Copilot, Kimi, AntiGravity, Hermes, and Qoder expose only blanket "before every tool" hooks — turn those into in-notch approve/deny with the opt-in **"Review every action"** mode (Settings → General). The rest (Factory, CodeBuddy, Cline, Kiro) handle approvals in-tool; Code Island still tracks their sessions, tools, and completions.
 
 ## Requirements
 
