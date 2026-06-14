@@ -60,6 +60,7 @@ struct SettingsView: View {
     var onReloadSounds: (() -> Void)? = nil
 
     @State private var selection: SettingsSection = .general
+    @State private var soundReloaded = false
 
     /// "v1.4.0" when bundled normally; "dev" when run from `swift run` /
     /// `.build/debug/CodeIsland` (no Info.plist version baked in).
@@ -430,7 +431,19 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button("Open Folder") { openSoundPacksFolder() }
-                    Button("Reload") { onReloadSounds?() }
+                    Button("Reload") {
+                        onReloadSounds?()
+                        withAnimation { soundReloaded = true }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation { soundReloaded = false }
+                        }
+                    }
+                    if soundReloaded {
+                        Label("Reloaded", systemImage: "checkmark.circle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.green)
+                            .transition(.opacity)
+                    }
                 }
                 .controlSize(.small)
             }
@@ -616,7 +629,10 @@ private struct IntegrationRow: View {
     let title: String
     let subtitle: String
     let accent: Color
-    let install: () -> Void
+    let install: () -> Bool
+
+    private enum Status { case idle, success, failure }
+    @State private var status: Status = .idle
 
     var body: some View {
         HStack {
@@ -630,8 +646,29 @@ private struct IntegrationRow: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
-            Button("Reinstall hooks", action: install)
-                .controlSize(.small)
+            switch status {
+            case .idle:
+                Button("Reinstall hooks") { run() }
+                    .controlSize(.small)
+            case .success:
+                Label("Reinstalled", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.green)
+                    .transition(.opacity)
+            case .failure:
+                Label("Failed — check the log", systemImage: "xmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.red)
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    private func run() {
+        let ok = install()
+        withAnimation { status = ok ? .success : .failure }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { status = .idle }
         }
     }
 }
