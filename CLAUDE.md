@@ -63,12 +63,14 @@ Each `Session.source` defaults to "claude" if the bridge doesn't stamp it. **The
 
 ## Codex Permission Persistence
 
-Codex rejects Claude's `updatedPermissions` shape. For Allow All / Bypass we instead append a `prefix_rule(...)` block to `~/.codex/rules/codeisland.rules` (see `CodexPermissionRules.swift`):
+Codex fires the **native `PermissionRequest`** hook event (same Claude-shaped `{decision:{behavior:"allow"|"deny"}}` response — verified docs: developers.openai.com/codex/hooks), so **Allow Once / Deny work directly** through the hook decision, just like Claude.
+
+The catch is **persistence**: Codex's PermissionRequest decides a *single* call only, and `updatedPermissions`/`updatedInput` are **unsupported (fail-closed)** — sending them makes Codex DENY. So for **Allow All / Bypass** we append a `prefix_rule(...)` block to `~/.codex/rules/codeisland.rules` (see `CodexPermissionRules.swift`) AND return a plain `behavior: allow` (the rule matches future calls):
 - **Allow All** for Bash: first 3 tokens become the prefix (`git commit -m`)
 - **Allow All** for other tools: prefix is the tool name
 - **Bypass** (broad): first 1 token (Codex rejects empty patterns — true wildcards aren't possible)
 
-The hook then responds with a plain `behavior: allow` since the rule will match future calls.
+(`[features].hooks = true` in config.toml is written defensively — hooks are on by default; the key only *disables* via `false`.)
 
 ## Codex `request_user_input` Mirror
 
