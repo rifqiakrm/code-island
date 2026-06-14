@@ -888,6 +888,7 @@ swift build -c release
       if (recording) {
         document.body.classList.add('record');
         if (cine) document.body.classList.add('cine');
+        if (params.has('nomark')) document.body.classList.add('nomark');
         const stage = document.createElement('div');
         stage.id = 'record-stage';
         const scale = parseFloat(params.get('scale') || '1.5');

@@ -6,7 +6,7 @@ const W = parseInt(process.argv[3]||'1080'), H = parseInt(process.argv[4]||'1080
 const outDir = process.argv[5]||'./vid', scale = process.argv[6]||'1.5';
 const short = process.argv[7]==='1', cine = process.argv[8]==='1';
 fs.mkdirSync(outDir, { recursive: true });
-let q = '?record&scale=' + scale + (short ? '&short' : '') + (cine ? '&cine' : '');
+let q = '?record&scale=' + scale + (short ? '&short' : '') + (cine ? '&cine' : '') + (process.env.NOMARK ? '&nomark' : '');
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: { width: W, height: H }, deviceScaleFactor: 1,

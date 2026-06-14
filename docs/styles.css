@@ -892,7 +892,11 @@ body.record > *:not(#record-stage) { display: none !important; }
 
 /* ===== CINEMATIC MODE (?cine) — Apple-style headlines + title cards ===== */
 body.cine #record-stage .rec-wordmark,
-body.cine #record-stage .rec-cap { display: none; }
+body.cine #record-stage .rec-cap,
+body.nomark #record-stage .rec-wordmark,
+body.nomark #record-stage .rec-cap { display: none; }
+/* nomark centres the notch vertically since there's no wordmark below it */
+body.nomark #record-stage { justify-content: flex-start; padding-top: 4%; }
 body.cine #record-stage .notch-shape { transition: width 0.6s cubic-bezier(0.34,1.2,0.4,1), height 0.6s cubic-bezier(0.34,1.2,0.4,1), border-radius 0.6s ease, opacity 0.7s ease; }
 #record-stage .cine-headline {
   position: absolute; left: 7%; right: 7%; bottom: 17%; z-index: 3; text-align: center;
