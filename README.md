@@ -14,6 +14,12 @@
 <img src="https://img.shields.io/badge/license-personal%20use-5b8def" alt="License: personal use" />
 </p>
 
+<br/>
+
+<!-- Demo GIF is hosted as a GitHub release asset (tag: media), not committed to
+     the repo, so clones/pulls stay small. -->
+<img src="https://github.com/rifqiakrm/code-island/releases/download/media/readme-demo.gif" alt="Code Island in action — the notch cycling through session list, permission, themes, and the 17 agent mascots" width="760" />
+
 </div>
 
 ## Features
