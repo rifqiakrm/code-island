@@ -802,7 +802,13 @@ swift build -c release
         el.style.position = prev.pos;
       });
 
-      const seq = [
+      const params = new URLSearchParams(location.search);
+      const short = params.has('short');     // ?short → ~20s highlight cut
+      const themeInterval = short ? 1100 : 1500;
+
+      // Full reel (~40s, all 8 states) vs short highlight cut (~22s, the most
+      // visual features). The recorder reads window.__loopMs so timing flows.
+      const fullSeq = [
         { state: 'idle',     label: 'Idle',       hold: 1100 },
         { state: 'list',     label: 'List view',  hold: 3400 },
         { state: 'idle',     label: 'Idle',       hold: 800  },
@@ -820,6 +826,19 @@ swift build -c release
         { state: 'idle',     label: 'Idle',       hold: 800  },
         { state: 'sound',    label: 'Sound packs',hold: 3600 },
       ];
+      const shortSeq = [
+        { state: 'idle',     label: 'Idle',       hold: 700  },
+        { state: 'list',     label: 'List view',  hold: 2800 },
+        { state: 'idle',     label: 'Idle',       hold: 500  },
+        { state: 'perm',     label: 'Permission', hold: 2800 },
+        { state: 'idle',     label: 'Idle',       hold: 500  },
+        { state: 'themes',   label: 'Themes',     hold: 5700 },
+        { state: 'idle',     label: 'Idle',       hold: 500  },
+        { state: 'mascots',  label: '17 mascots', hold: 2900 },
+        { state: 'idle',     label: 'Idle',       hold: 500  },
+        { state: 'jumpto',   label: 'Jump-to',    hold: 3200 },
+      ];
+      const seq = short ? shortSeq : fullSeq;
 
       // Total loop length (sum of holds) — used by the offline recorder.
       window.__loopMs = seq.reduce((a, s) => a + s.hold, 0);
@@ -840,7 +859,7 @@ swift build -c release
           t = (t + 1) % THEMES.length;
         };
         apply();
-        themeTimer = setInterval(apply, 1500);
+        themeTimer = setInterval(apply, themeInterval);
       }
       function stopThemes() {
         if (themeTimer) { clearInterval(themeTimer); themeTimer = null; }
@@ -850,7 +869,6 @@ swift build -c release
       // ?record builds a clean full-viewport stage (wallpaper + wordmark) and
       // moves the live notch into it, so the cycling animation can be captured
       // as a social video with no page chrome.
-      const params = new URLSearchParams(location.search);
       const recording = params.has('record');
       let recCap = null;
       if (recording) {

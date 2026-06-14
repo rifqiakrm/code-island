@@ -5,7 +5,7 @@ const out = process.argv[4] || 'rec.png';
 const W = parseInt(process.argv[5]||'1080'), Hh = parseInt(process.argv[6]||'1080');
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: W, height: Hh }, deviceScaleFactor: 1 });
-await page.goto('file://' + file + '?record', { waitUntil: 'networkidle' });
+await page.goto('file://' + file + '?record&scale=' + (process.argv[7]||'1.5') + '', { waitUntil: 'networkidle' });
 await page.evaluate((st) => {
   let id = setTimeout(()=>{},0); for (let k=0;k<=id;k++) clearTimeout(k);
   window.setTimeout=()=>0; window.setInterval=()=>0;
