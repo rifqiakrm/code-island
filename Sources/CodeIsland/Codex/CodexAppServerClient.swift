@@ -18,9 +18,8 @@ struct CodexThreadInfo: Equatable {
 /// Scope is intentionally tight — we only consume the few JSON-RPC
 /// notifications that carry session metadata. No request/response cycle, no
 /// reconnection-state machine; if the subprocess dies we relaunch after a
-/// short backoff and that's it. The reference repo's full client lives at
-/// `/Users/user/Projects/CodeIsland/Sources/CodeIslandCore/CodexAppServerClient.swift`
-/// if a richer integration is needed later.
+/// short backoff and that's it. A fuller app-server client (request/response,
+/// reconnection) can be layered on here if a richer integration is needed later.
 @MainActor
 final class CodexAppServerClient: ObservableObject {
     /// Snapshot of every active Codex thread we know about via the app-server
