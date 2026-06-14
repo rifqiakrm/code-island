@@ -112,6 +112,7 @@ let eventNormalization: [String: [String: String]] = [
         "sessionStart": "SessionStart", "sessionEnd": "SessionEnd",
         "userPromptSubmitted": "UserPromptSubmit",
         "preToolUse": "PreToolUse", "postToolUse": "PostToolUse",
+        "agentStop": "Stop",          // the real "agent finished" event
         "errorOccurred": "Notification",
     ],
     "qwen": ["PostToolUseFailure": "skip"],
@@ -159,6 +160,7 @@ let permissionGateEvents: [String: Set<String>] = [
     "cursor": ["beforeShellExecution", "beforeMCPExecution"],
     "copilot": ["preToolUse"],
     "kimi": ["PreToolUse"],
+    "qoder": ["PreToolUse"],       // Qoder has no PermissionRequest; gate in PreToolUse
     "antigravity": ["PreToolUse"],
     "hermes": ["pre_tool_call"],
 ]
@@ -647,7 +649,8 @@ func translateStrictDecision(source: String, appResponse: Data) -> Data {
         if deny { json = "{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"\(reason)\"}" }
         else if ask { json = "{\"permissionDecision\":\"ask\"}" }
         else { json = "{\"permissionDecision\":\"allow\"}" }
-    case "kimi":
+    case "kimi", "qoder":
+        // Identical Claude-style PreToolUse permissionDecision shape.
         if deny { json = "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"\(reason)\"}}" }
         else { json = "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\"}}" }
     default:

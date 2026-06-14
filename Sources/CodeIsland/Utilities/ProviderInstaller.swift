@@ -72,22 +72,27 @@ enum ProviderInstaller {
                    events: standardEvents + [("PostToolUseFailure", 5), ("PermissionRequest", 300)]),
 
         // Claude-Code forks — permission support differs per tool's docs:
-        //  • Qwen + Qoder CLI document a Claude-IDENTICAL PermissionRequest
-        //    (hookSpecificOutput.decision.behavior), so our existing Claude
-        //    response works as-is. (Qoder's doesn't fire in headless `-p` mode
-        //    — that's fine; it just no-ops there.)
-        //  • Factory (droid) has NO PermissionRequest — it gates inside
-        //    PreToolUse with a different shape. CodeBuddy lists the event but
-        //    leaves it undocumented, so subscribing risks a hang. Both omit it.
+        //  • Qwen documents a Claude-IDENTICAL PermissionRequest event, so our
+        //    Claude response shape works as-is.
+        //  • Qoder supports only 5 events (UserPromptSubmit, PreToolUse,
+        //    PostToolUse, PostToolUseFailure, Stop) and has NO PermissionRequest
+        //    — it gates inside PreToolUse (permissionDecision), so it uses opt-in
+        //    strict approval like Kimi. (Verified: docs.qoder.com/extensions/hooks.)
+        //  • Factory (droid) canonical hook file is hooks.json (settings.json is
+        //    only a fallback, shadowed if hooks.json exists); no SubagentStart,
+        //    no PermissionRequest (gates in PreToolUse). CodeBuddy omits it.
         Descriptor(source: "qoder", displayName: "Qoder",
                    configDirRel: ".qoder", configFileRel: "settings.json",
                    format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: false,
-                   events: standardEvents + [("PermissionRequest", 300)]),
+                   events: [("UserPromptSubmit", 5), ("PreToolUse", 300),
+                            ("PostToolUse", 5), ("PostToolUseFailure", 5), ("Stop", 5)]),
 
         Descriptor(source: "droid", displayName: "Factory",
-                   configDirRel: ".factory", configFileRel: "settings.json",
+                   configDirRel: ".factory", configFileRel: "hooks.json",
                    format: .claudeFork, timeoutUnit: .seconds, createDirIfMissing: true,
-                   events: standardEvents),
+                   events: [("UserPromptSubmit", 5), ("PreToolUse", 5), ("PostToolUse", 5),
+                            ("SessionStart", 5), ("SessionEnd", 5), ("Stop", 5),
+                            ("SubagentStop", 5), ("Notification", 5), ("PreCompact", 5)]),
 
         Descriptor(source: "codebuddy", displayName: "CodeBuddy",
                    configDirRel: ".codebuddy", configFileRel: "settings.json",
@@ -108,7 +113,8 @@ enum ProviderInstaller {
                    configDirRel: ".copilot", configFileRel: "hooks/codeisland.json",
                    format: .copilot, timeoutUnit: .seconds, createDirIfMissing: false,
                    events: [("sessionStart", 5), ("sessionEnd", 5), ("userPromptSubmitted", 5),
-                            ("preToolUse", 300), ("postToolUse", 5), ("errorOccurred", 5)]),
+                            ("preToolUse", 300), ("postToolUse", 5), ("agentStop", 5),
+                            ("errorOccurred", 5)]),
 
         // Kimi Code CLI — TOML [[hooks]] blocks. Seconds; max timeout 600 (no
         // PermissionRequest event). Don't bootstrap ~/.kimi for non-Kimi users.
@@ -127,15 +133,17 @@ enum ProviderInstaller {
                    format: .opencodePlugin, timeoutUnit: .seconds, createDirIfMissing: false,
                    events: []),
 
-        // Cline — executable bash script per event in ~/Documents/Cline/Hooks.
-        // Detected via VS Code globalStorage OR ~/Documents/Cline (footprint
-        // differs from where we write), so don't litter Documents otherwise.
+        // Cline — executable bash script per event in ~/Documents/Cline/Rules/Hooks.
+        // (The dir is Rules/Hooks, NOT Hooks — Cline only loads from there; the
+        // old Documents/Cline/Hooks path silently never fired.) Detected via VS
+        // Code globalStorage OR ~/Documents/Cline so we don't litter Documents.
+        // PreCompact is not a Cline hook event — dropped.
         Descriptor(source: "cline", displayName: "Cline",
-                   configDirRel: "Documents/Cline/Hooks", configFileRel: "",
+                   configDirRel: "Documents/Cline/Rules/Hooks", configFileRel: "",
                    format: .clineScripts, timeoutUnit: .seconds, createDirIfMissing: false,
                    events: [("UserPromptSubmit", 5), ("PreToolUse", 5), ("PostToolUse", 5),
                             ("TaskStart", 5), ("TaskResume", 5), ("TaskCancel", 5),
-                            ("TaskComplete", 5), ("PreCompact", 5)],
+                            ("TaskComplete", 5)],
                    detectPaths: ["Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
                                  "Documents/Cline"]),
 
@@ -319,6 +327,7 @@ enum ProviderInstaller {
     private static func writeFlatHooks(_ d: Descriptor, at url: URL) -> Bool {
         let base = launcherCommand(d.source)
         return mergeJSONObject(at: url) { root in
+            root["version"] = 1   // Cursor's documented hooks.json schema requires it
             var hooks = root["hooks"] as? [String: Any] ?? [:]
             for (event, _) in d.events {
                 var entries = (hooks[event] as? [[String: Any]] ?? []).filter { !isOursFlat($0) }
@@ -895,18 +904,20 @@ export default {
       return { session_id: `opencode-${sid}`, _source: "opencode", ...extra };
     }
 
-    async function replyPermission(requestId, reply, reason) {
+    async function replyPermission(sessionId, permissionId, response) {
+      // OpenCode API: POST /session/{id}/permissions/{permissionID} with
+      // body { response: "once" | "always" | "reject" }.
       try {
         if (typeof heyApi?.request === "function") {
-          await heyApi.request({ method: "POST", url: "/permission/{requestID}/reply",
-            path: { requestID: requestId }, body: { reply, message: reason } });
+          await heyApi.request({ method: "POST", url: "/session/{id}/permissions/{permissionID}",
+            path: { id: sessionId, permissionID: permissionId }, body: { response } });
           return;
         }
       } catch {}
       try {
-        await fetch(`http://localhost:${serverPort}/permission/${requestId}/reply`, {
+        await fetch(`http://localhost:${serverPort}/session/${sessionId}/permissions/${permissionId}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reply, message: reason }) });
+          body: JSON.stringify({ response }) });
       } catch {}
     }
 
@@ -1016,7 +1027,7 @@ export default {
           const hasUpdated = decision?.updatedPermissions != null;
           const reply = (behavior === "always" || (behavior === "allow" && hasUpdated)) ? "always"
             : behavior === "allow" ? "once" : "reject";
-          await replyPermission(p.id, reply, decision?.reason);
+          await replyPermission(p.sessionID, p.id, reply);
           return;
         }
         if (t === "permission.replied" && p.sessionID) {

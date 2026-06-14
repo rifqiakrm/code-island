@@ -176,7 +176,7 @@ struct AIProvider: Identifiable, Hashable {
     var permissionActions: [PermissionAction] {
         switch id {
         case "claude", "codex":          return [.deny, .allowOnce, .allowAll, .bypass]
-        case "qwen", "qoder", "opencode": return [.deny, .allowOnce, .allowAll]
+        case "qwen", "opencode":         return [.deny, .allowOnce, .allowAll]
         case "cursor", "copilot":        return [.deny, .allowOnce, .deferToApp]
         default:                         return [.deny, .allowOnce]   // gemini, kimi, forks, pi, kiro, …
         }
