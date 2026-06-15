@@ -152,7 +152,10 @@ struct SessionCardView: View {
                     .font(theme.font(size: 10))
                     .foregroundColor(.white.opacity(0.3))
                 // TimelineView ticks every 100ms so the elapsed time is live.
-                TimelineView(.periodic(from: .now, by: 0.1)) { ctx in
+                // Tick once a second: the elapsed display reads in whole seconds
+                // at a glance, so 10Hz just repainted the transparent window for
+                // nothing (× every thinking card).
+                TimelineView(.periodic(from: .now, by: 1.0)) { ctx in
                     Text(formatElapsed(ctx.date.timeIntervalSince(started)))
                         .font(theme.font(size: 10))
                         .foregroundColor(.white.opacity(0.55))
@@ -224,22 +227,33 @@ struct SessionCardView: View {
     }
 }
 
+/// One shared ~6Hz tick drives every "thinking" sparkle in lockstep. A
+/// `repeatForever` animation interpolates at the display's 60–120Hz and a
+/// transparent overlay recomposites its whole area on each frame — so N pulsing
+/// cards used to mean N×120 full-window repaints/sec. Stepping discretely (and
+/// in sync) cuts that to ~6 repaints/sec total, regardless of card count.
+private let sparklePulseClock = Timer.publish(every: 0.16, on: .main, in: .common).autoconnect()
+
 /// Pulsing/rotating sparkle used as the "thinking" indicator on the session card.
 struct AnimatedSparkle: View {
     let color: Color
-    @State private var pulse = false
+    @State private var phase = 0
+
+    // Same extremes as the old smooth pulse (0.85↔1.25, 0.6↔1.0, ±18°), but as
+    // 4 discrete frames — matches the pixel-art mascots' stepped motion.
+    private static let scales: [CGFloat] = [0.85, 1.05, 1.25, 1.05]
+    private static let opacities: [Double] = [0.6, 0.8, 1.0, 0.8]
+    private static let angles: [Double] = [-18, 0, 18, 0]
 
     var body: some View {
         Image(systemName: "sparkle")
             .font(.system(size: 10))
             .foregroundColor(color)
-            .scaleEffect(pulse ? 1.25 : 0.85)
-            .opacity(pulse ? 1.0 : 0.6)
-            .rotationEffect(.degrees(pulse ? 18 : -18))
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
+            .scaleEffect(Self.scales[phase])
+            .opacity(Self.opacities[phase])
+            .rotationEffect(.degrees(Self.angles[phase]))
+            .onReceive(sparklePulseClock) { _ in
+                phase = (phase + 1) % 4
             }
     }
 }
