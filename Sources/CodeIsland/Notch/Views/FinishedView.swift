@@ -142,12 +142,13 @@ struct FinishedView: View {
                     )
 
                     ScrollView {
-                        Text(reply)
-                            .font(theme.font(size: 11))
-                            .foregroundColor(theme.wellForeground.opacity(0.85))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                            .padding(10)
+                        MarkdownText(
+                            text: reply,
+                            color: theme.wellForeground.opacity(0.85),
+                            codeBackground: theme.lightWells ? Color.black.opacity(0.07) : Color.black.opacity(0.35)
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
                     }
                     .frame(maxHeight: isExpanded ? 400 : 240)
                     .background(

@@ -105,12 +105,13 @@ struct SessionCardView: View {
                                 .font(theme.font(size: 9, weight: .heavy))
                                 .foregroundColor(session.provider.accentColor.opacity(0.85))
                                 .kerning(1.2)
-                            // List cards are a glance: show a short, length-capped
-                            // preview (the full response lives in the Finished view).
-                            // A ScrollView here lays out the ENTIRE response to size
-                            // its content — ×N cards that spiked CPU to ~100% when
-                            // several long responses were on screen at once.
-                            Text(String(resp.prefix(280)))
+                            // Glance preview: inline-markdown (bold / `code` /
+                            // italics) over a length-capped slice, line-limited.
+                            // We cap the input and avoid a ScrollView on purpose —
+                            // a ScrollView lays out the ENTIRE response to size
+                            // itself, which spiked CPU ×N cards. Full reply (with
+                            // code blocks etc.) lives in the Finished view.
+                            Text(MarkdownText.inline(String(resp.prefix(400))))
                                 .font(theme.font(size: 11))
                                 .foregroundColor(.white.opacity(0.85))
                                 .frame(maxWidth: .infinity, alignment: .leading)
