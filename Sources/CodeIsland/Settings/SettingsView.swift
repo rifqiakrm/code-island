@@ -687,6 +687,23 @@ struct SettingsView: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+
+        Section {
+            Button(role: .destructive) {
+                NSApp.terminate(nil)
+            } label: {
+                HStack {
+                    Image(systemName: "power")
+                    Text("Quit Code Island")
+                }
+            }
+        } footer: {
+            Text("Code Island runs from the menu bar (and the notch). Quitting stops session tracking until you reopen it.")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private func openSoundPacksFolder() {
