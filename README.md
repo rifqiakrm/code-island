@@ -38,6 +38,7 @@
 - **8-bit sound effects** — per-event sound picker (built-in chime / off / your own), an in-app sound library with an "Add Sound…" importer, and ▶ previews
 - **Pixel-art mascots** — every agent gets its own hand-drawn pixel mascot that animates by status
 - **Notch themes** — 5 looks (Default, Liquid Glass, Retro Pixel, Terminal, Neo-Brutalist), switch live in Settings → Appearance
+- **Works without a notch** — on Macs with a notch the panel sits in the notch; on external displays / older Macs it shows as a compact bar at the top center
 
 ## Supported Tools
 

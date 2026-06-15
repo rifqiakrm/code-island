@@ -35,7 +35,7 @@
   <!-- HERO -->
   <header class="hero" id="top">
     <div class="hero-inner">
-      <span class="eyebrow">v1.4.6 · macOS 14+ · Open source</span>
+      <span class="eyebrow">v1.4.7 · macOS 14+ · Open source</span>
       <h1>Your AI coding agents,<br/><span class="accent">live in the notch.</span></h1>
       <p class="subtitle">
         Monitor sessions, approve permissions, answer questions, and jump back to your terminal —<br/>
@@ -444,7 +444,7 @@
               <li><span class="snd-name">Error</span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="snd-toggle on"></span></li>
               <li class="muted"><span class="snd-name">Tool use</span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="snd-toggle"></span></li>
             </ul>
-            <div class="sound-foot">Drop your own <code>.wav</code> into ~/.code-island/sound-packs</div>
+            <div class="sound-foot">Import your own sounds in Settings → Sound</div>
           </div>
 
         </div>
@@ -495,7 +495,7 @@
         <article class="feature">
           <div class="ico">♪</div>
           <h3>Sound packs</h3>
-          <p>8-bit chiptune defaults, per-event toggles. Drop your own <code>.wav</code> / <code>.mp3</code> files into a folder to override.</p>
+          <p>8-bit chiptune defaults with a per-event sound picker. Import your own <code>.wav</code> / <code>.mp3</code> via "Add Sound…", assign them per event, and ▶ preview — no file-fiddling.</p>
         </article>
         <article class="feature">
           <div class="ico">▣</div>
@@ -618,7 +618,7 @@
         </div>
       </div>
 
-      <p class="lead reveal" style="margin-top:52px;">…and nineteen more — each with its own animated mascot, accent, and hooks:</p>
+      <p class="lead reveal" style="margin-top:52px;">…and fifteen more — each with its own animated mascot, accent, and hooks:</p>
       <div class="reveal" style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:18px;">
         <div class="agent-chip" style="display:flex;align-items:center;gap:11px;padding:13px 17px;border:1px solid var(--border);border-radius:15px;background:var(--bg-soft);min-width:210px;">
           <img src="mascots/gemini.png" width="38" height="38" alt="" />
@@ -739,12 +739,12 @@ swift build -c release
 
       <details>
         <summary>How do hooks get installed?</summary>
-        <p>On every launch, Code Island writes <code>~/.claude/settings.json</code> entries for Claude Code and <code>~/.codex/hooks.json</code> + <code>[features].hooks = true</code> for Codex. Idempotent — safe to delete the app and reinstall, or remove the hook files and let the app rewrite them.</p>
+        <p>On every launch, Code Island auto-installs hooks for each of the 17 agents it detects — writing each tool's own config (e.g. <code>~/.claude/settings.json</code>, <code>~/.codex/hooks.json</code>, plus the right format for Gemini, Cursor, Kimi, OpenCode, and the rest). It also picks up multiple Claude profiles (<code>~/.claude-work</code>, etc.). Idempotent and non-destructive — foreign hooks are preserved, the original is backed up, and you can delete the app or the hook files and let it rewrite them.</p>
       </details>
 
       <details>
         <summary>What if I don't have a notch?</summary>
-        <p>You still get a 280×5 hover strip at the top of the screen. Expand on hover, collapse on leave — same UX, just no physical notch to wrap around.</p>
+        <p>It still works — on external displays or Macs without a notch, the panel shows as a compact bar at the top center of the screen. Hover to expand, leave to collapse — same UX, no physical notch needed.</p>
       </details>
 
       <details>
