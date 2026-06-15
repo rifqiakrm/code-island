@@ -11,7 +11,7 @@
 <p>
 <img src="https://img.shields.io/badge/macOS-14%2B-1d1d1f?logo=apple&logoColor=white" alt="macOS 14+" />
 <img src="https://img.shields.io/badge/Swift-5.9%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.9+" />
-<img src="https://img.shields.io/badge/license-personal%20use-5b8def" alt="License: personal use" />
+<img src="https://img.shields.io/badge/license-GPLv3-5b8def" alt="License: GPLv3" />
 </p>
 
 <br/>
@@ -196,9 +196,9 @@ Code Island is free and built in my spare time. If it's saved you a few context-
 
 ## License
 
-**Personal, non-commercial use only. No redistribution.** See [LICENSE](LICENSE) for full terms.
+**Free & open source under the [GNU GPLv3](LICENSE).** © 2026 Rifqi Akram.
 
-For commercial licensing, please contact the copyright holder.
+You're free to use, modify, and redistribute it — with one condition: any distributed fork or derivative must also be open source under GPLv3 (it can't be closed-sourced or shipped proprietary).
 
 ## Acknowledgements
 
