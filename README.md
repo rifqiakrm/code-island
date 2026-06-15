@@ -29,6 +29,7 @@
 - **Permission UI** — approve, deny, allow-all, or bypass from the notch without switching apps
 - **Question UI** — Claude's `AskUserQuestion` and Codex's `request_user_input` surfaced inline; click to answer (Claude) or jump to the app (Codex)
 - **Finished notifications** — see the agent's reply inline when a task completes
+- **Markdown replies** — agent responses render markdown in the notch: headers, **bold**/*italic*, `code` + fenced code blocks, tables, bullet/numbered/task lists, and blockquotes
 - **Per-provider rate limits** — 5h / 7d usage with color-coded warnings; tap to cycle providers
 - **Permission queue** — multiple agents' permissions queue automatically
 - **Claude multi-profile** — auto-installs into `~/.claude` *and* every `~/.claude-*` profile (`CLAUDE_CONFIG_DIR` targets); sessions are labeled by profile (e.g. `work` / `personal`)
