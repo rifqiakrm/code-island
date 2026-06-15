@@ -13,14 +13,18 @@ final class MenuBarManager: NSObject, NSMenuDelegate {
     private let updateChecker: UpdateChecker
     private let onQuit: () -> Void
     private let onReloadSounds: () -> Void
+    private let onPreviewEvent: (SoundEvent) -> Void
+    private let onPreviewFile: (String) -> Void
     private let onShowWhatsNew: () -> Void
     private var settingsWindow: NSWindow?
 
-    init(settingsStore: SettingsStore, sessionStore: SessionStore, updateChecker: UpdateChecker, onReloadSounds: @escaping () -> Void, onShowWhatsNew: @escaping () -> Void, onQuit: @escaping () -> Void) {
+    init(settingsStore: SettingsStore, sessionStore: SessionStore, updateChecker: UpdateChecker, onReloadSounds: @escaping () -> Void, onPreviewEvent: @escaping (SoundEvent) -> Void, onPreviewFile: @escaping (String) -> Void, onShowWhatsNew: @escaping () -> Void, onQuit: @escaping () -> Void) {
         self.settingsStore = settingsStore
         self.sessionStore = sessionStore
         self.updateChecker = updateChecker
         self.onReloadSounds = onReloadSounds
+        self.onPreviewEvent = onPreviewEvent
+        self.onPreviewFile = onPreviewFile
         self.onShowWhatsNew = onShowWhatsNew
         self.onQuit = onQuit
         super.init()
@@ -153,7 +157,7 @@ final class MenuBarManager: NSObject, NSMenuDelegate {
             return
         }
 
-        let view = SettingsView(settingsStore: settingsStore, updateChecker: updateChecker, onReloadSounds: onReloadSounds)
+        let view = SettingsView(settingsStore: settingsStore, updateChecker: updateChecker, onReloadSounds: onReloadSounds, onPreviewEvent: onPreviewEvent, onPreviewFile: onPreviewFile)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 580),
             styleMask: [.titled, .closable],

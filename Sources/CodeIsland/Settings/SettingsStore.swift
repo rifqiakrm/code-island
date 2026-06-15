@@ -54,21 +54,56 @@ final class SettingsStore: ObservableObject {
         didSet { persistStrictApproval() }
     }
 
-    // Per-sound toggles
-    @Published var soundSessionStart: Bool {
-        didSet { UserDefaults.standard.set(soundSessionStart, forKey: "soundSessionStart") }
+    /// Per-event sound assignment: `SoundEvent.rawValue` → "default" | "off" |
+    /// "<library filename>". Missing key = "default". Persisted as JSON.
+    @Published var soundAssignments: [String: String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(soundAssignments) {
+                UserDefaults.standard.set(data, forKey: "soundAssignments")
+            }
+        }
     }
-    @Published var soundCompletion: Bool {
-        didSet { UserDefaults.standard.set(soundCompletion, forKey: "soundCompletion") }
+    func soundChoice(for eventRaw: String) -> String { soundAssignments[eventRaw] ?? "default" }
+    func setSoundChoice(_ choice: String, for eventRaw: String) { soundAssignments[eventRaw] = choice }
+
+    static let supportedAudioExts = ["wav", "mp3", "m4a", "aiff", "caf"]
+
+    /// The sound library = audio files the user has imported (and any legacy
+    /// event-named files), living in `~/.code-island/sound-packs/`.
+    func soundLibraryDirectory() -> URL {
+        let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".code-island/sound-packs")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
     }
-    @Published var soundToolUse: Bool {
-        didSet { UserDefaults.standard.set(soundToolUse, forKey: "soundToolUse") }
+    func soundLibraryFiles() -> [String] {
+        let dir = soundLibraryDirectory()
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        return files
+            .filter { Self.supportedAudioExts.contains(($0 as NSString).pathExtension.lowercased()) }
+            .sorted()
     }
-    @Published var soundError: Bool {
-        didSet { UserDefaults.standard.set(soundError, forKey: "soundError") }
+    /// Copy an imported file into the library (de-duping the name). Returns the stored filename.
+    @discardableResult
+    func importSound(from url: URL) -> String? {
+        let dir = soundLibraryDirectory()
+        let base = (url.lastPathComponent as NSString).deletingPathExtension
+        let ext = (url.lastPathComponent as NSString).pathExtension
+        var name = url.lastPathComponent
+        var dest = dir.appendingPathComponent(name)
+        var i = 1
+        while FileManager.default.fileExists(atPath: dest.path) {
+            name = "\(base)-\(i).\(ext)"; dest = dir.appendingPathComponent(name); i += 1
+        }
+        do {
+            try FileManager.default.copyItem(at: url, to: dest)
+            objectWillChange.send()
+            return name
+        } catch { return nil }
     }
-    @Published var soundPermission: Bool {
-        didSet { UserDefaults.standard.set(soundPermission, forKey: "soundPermission") }
+    func deleteSound(_ filename: String) {
+        try? FileManager.default.removeItem(at: soundLibraryDirectory().appendingPathComponent(filename))
+        for (k, v) in soundAssignments where v == filename { soundAssignments[k] = "default" }
+        objectWillChange.send()
     }
 
     init() {
@@ -95,11 +130,23 @@ final class SettingsStore: ObservableObject {
         self.autoExpandOnPermission = defaults.bool(forKey: "autoExpandOnPermission")
         self.launchAtLogin = defaults.bool(forKey: "launchAtLogin")
         self.hasCompletedOnboarding = defaults.bool(forKey: "hasCompletedOnboarding")
-        self.soundSessionStart = defaults.bool(forKey: "soundSessionStart")
-        self.soundCompletion = defaults.bool(forKey: "soundCompletion")
-        self.soundToolUse = defaults.bool(forKey: "soundToolUse")
-        self.soundError = defaults.bool(forKey: "soundError")
-        self.soundPermission = defaults.bool(forKey: "soundPermission")
+        // Load per-event assignments, or migrate once from the old toggles
+        // (a `false` toggle → "off"). The old keys stay registered above so
+        // this read returns correct defaults for fresh installs too.
+        if let data = defaults.data(forKey: "soundAssignments"),
+           let map = try? JSONDecoder().decode([String: String].self, from: data) {
+            self.soundAssignments = map
+        } else {
+            var m: [String: String] = [:]
+            if !defaults.bool(forKey: "soundSessionStart") { m["session-start"] = "off"; m["session-end"] = "off" }
+            if !defaults.bool(forKey: "soundCompletion") { m["completion"] = "off" }
+            if !defaults.bool(forKey: "soundToolUse") { m["tool-use"] = "off" }
+            if !defaults.bool(forKey: "soundError") { m["error"] = "off" }
+            if !defaults.bool(forKey: "soundPermission") {
+                m["approval-needed"] = "off"; m["approval-granted"] = "off"; m["approval-denied"] = "off"
+            }
+            self.soundAssignments = m
+        }
         self.notchThemeID = NotchThemeID(rawValue: defaults.string(forKey: "notchThemeID") ?? "") ?? .default
         self.hasSeenThemeOnboarding = defaults.bool(forKey: "hasSeenThemeOnboarding")
         self.lastWhatsNewVersion = defaults.string(forKey: "lastWhatsNewVersion") ?? ""

@@ -19,6 +19,8 @@ final class SoundEngine {
     private var enabled = true
     private var volume: Float = 0.7
     private var disabledEvents: Set<SoundEvent> = []
+    /// event.rawValue → "default" | "off" | "<library filename>".
+    private var assignments: [String: String] = [:]
 
     init() {
         setupAudioEngine()
@@ -54,12 +56,23 @@ final class SoundEngine {
         playerNode?.volume = self.volume
     }
 
-    func setEventEnabled(_ event: SoundEvent, enabled: Bool) {
-        if enabled {
-            disabledEvents.remove(event)
-        } else {
-            disabledEvents.insert(event)
-        }
+    /// Apply the per-event assignment map (Default / Off / a library file) and
+    /// rebuild the buffers.
+    func applyAssignments(_ map: [String: String]) {
+        assignments = map
+        loadSounds()
+    }
+
+    /// Play an event's currently-assigned sound regardless of enabled/off state
+    /// (used by the ▶ preview buttons in Settings).
+    func preview(_ event: SoundEvent) {
+        if let buffer = soundBuffers[event] { playBuffer(buffer) }
+    }
+
+    /// Play a specific library file (preview a "My Sounds" entry).
+    func previewFile(_ filename: String) {
+        let url = customSoundsDirectory().appendingPathComponent(filename)
+        if let buffer = loadAudioFile(url) { playBuffer(buffer) }
     }
 
     // MARK: - Audio Engine
@@ -94,22 +107,31 @@ final class SoundEngine {
 
     private func loadSounds() {
         let synth = SoundSynthesizer()
-        let customDir = customSoundsDirectory()
+        let dir = customSoundsDirectory()
         let supportedExts = ["wav", "mp3", "m4a", "aiff", "caf"]
+        disabledEvents = []
 
         for event in SoundEvent.allCases {
-            // Try to load a custom file from ~/.code-island/sound-packs/<event>.<ext>
-            var customBuffer: AVAudioPCMBuffer?
-            for ext in supportedExts {
-                let url = customDir.appendingPathComponent("\(event.rawValue).\(ext)")
-                if FileManager.default.fileExists(atPath: url.path),
-                   let buffer = loadAudioFile(url) {
-                    customBuffer = buffer
-                    print("[CodeIsland] Loaded custom sound: \(url.lastPathComponent)")
-                    break
+            let choice = assignments[event.rawValue] ?? "default"
+            if choice == "off" { disabledEvents.insert(event) }
+
+            // 1. An explicitly-assigned library file.
+            if choice != "default", choice != "off" {
+                let url = dir.appendingPathComponent(choice)
+                if FileManager.default.fileExists(atPath: url.path), let b = loadAudioFile(url) {
+                    soundBuffers[event] = b
+                    continue
                 }
             }
-            soundBuffers[event] = customBuffer ?? synth.generateSound(for: event)
+            // 2. "default": a legacy file named after the event, else the synth.
+            var buffer: AVAudioPCMBuffer?
+            for ext in supportedExts {
+                let url = dir.appendingPathComponent("\(event.rawValue).\(ext)")
+                if FileManager.default.fileExists(atPath: url.path), let b = loadAudioFile(url) {
+                    buffer = b; break
+                }
+            }
+            soundBuffers[event] = buffer ?? synth.generateSound(for: event)
         }
     }
 

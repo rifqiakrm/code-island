@@ -58,6 +58,9 @@ struct SettingsView: View {
     @ObservedObject var settingsStore: SettingsStore
     @ObservedObject var updateChecker: UpdateChecker
     var onReloadSounds: (() -> Void)? = nil
+    var onPreviewEvent: ((SoundEvent) -> Void)? = nil
+    var onPreviewFile: ((String) -> Void)? = nil
+    @State private var soundLibraryVersion = 0   // bump to refresh library list
 
     @State private var selection: SettingsSection = .general
     @State private var soundReloaded = false
@@ -412,42 +415,103 @@ struct SettingsView: View {
         }
 
         Section("Events") {
-            Toggle("Session start / end", isOn: $settingsStore.soundSessionStart)
-            Toggle("Completion",          isOn: $settingsStore.soundCompletion)
-            Toggle("Tool use",            isOn: $settingsStore.soundToolUse)
-            Toggle("Error",               isOn: $settingsStore.soundError)
-            Toggle("Permission",          isOn: $settingsStore.soundPermission)
+            ForEach(Self.soundEventRows, id: \.event) { row in
+                soundEventRow(row)
+            }
         }
         .disabled(!settingsStore.soundEnabled)
 
-        Section("Custom Sound Pack") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Drop audio files (.wav / .mp3 / .m4a) into the sound packs folder named after the event:")
+        Section {
+            let library = settingsStore.soundLibraryFiles()
+            let _ = soundLibraryVersion   // re-read when this changes
+            if library.isEmpty {
+                Text("No imported sounds yet.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
-                Text("session-start, session-end, completion, tool-use, error,\napproval-needed, approval-granted, approval-denied")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(.secondary.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 8) {
-                    Button("Open Folder") { openSoundPacksFolder() }
-                    Button("Reload") {
-                        onReloadSounds?()
-                        withAnimation { soundReloaded = true }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            withAnimation { soundReloaded = false }
-                        }
-                    }
-                    if soundReloaded {
-                        Label("Reloaded", systemImage: "checkmark.circle.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.green)
-                            .transition(.opacity)
+            } else {
+                ForEach(library, id: \.self) { file in
+                    HStack {
+                        Image(systemName: "music.note")
+                            .foregroundColor(.secondary)
+                        Text(file).font(.system(size: 12))
+                        Spacer()
+                        Button { onPreviewFile?(file) } label: { Image(systemName: "play.circle") }
+                            .buttonStyle(.borderless)
+                        Button(role: .destructive) {
+                            settingsStore.deleteSound(file)
+                            soundLibraryVersion += 1
+                            onReloadSounds?()
+                        } label: { Image(systemName: "trash") }
+                            .buttonStyle(.borderless)
                     }
                 }
-                .controlSize(.small)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                importSoundFile()
+            } label: {
+                Label("Add Sound…", systemImage: "plus")
+            }
+        } header: {
+            Text("My Sounds")
+        } footer: {
+            Text("Import .wav / .mp3 / .m4a / .aiff / .caf, then pick it for any event above. Default = the built-in 8-bit chime.")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private static let soundEventRows: [(event: SoundEvent, title: String, subtitle: String)] = [
+        (.sessionStart,   "Session start",    "A new agent session begins"),
+        (.sessionEnd,     "Session end",      "A session closes"),
+        (.completion,     "Task complete",    "The agent finished its turn"),
+        (.toolUse,        "Tool use",         "The agent runs a tool"),
+        (.error,          "Error",            "Tool failure or error"),
+        (.approvalNeeded, "Approval needed",  "Permission or question pending"),
+        (.approvalGranted,"Approval granted", "You allowed an action"),
+        (.approvalDenied, "Approval denied",  "You denied an action"),
+    ]
+
+    @ViewBuilder
+    private func soundEventRow(_ row: (event: SoundEvent, title: String, subtitle: String)) -> some View {
+        let library = settingsStore.soundLibraryFiles()
+        let _ = soundLibraryVersion
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title)
+                Text(row.subtitle).font(.system(size: 11)).foregroundColor(.secondary)
+            }
+            Spacer()
+            Picker("", selection: Binding(
+                get: { settingsStore.soundChoice(for: row.event.rawValue) },
+                set: { settingsStore.setSoundChoice($0, for: row.event.rawValue) }
+            )) {
+                Text("Default").tag("default")
+                Text("Off").tag("off")
+                if !library.isEmpty {
+                    Divider()
+                    ForEach(library, id: \.self) { Text($0).tag($0) }
+                }
+            }
+            .labelsHidden()
+            .frame(width: 150)
+            Button { onPreviewEvent?(row.event) } label: {
+                Image(systemName: "play.circle")
+            }
+            .buttonStyle(.borderless)
+        }
+    }
+
+    /// Native file picker → copy into the library → refresh.
+    private func importSoundFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.audio]
+        panel.prompt = "Import"
+        if panel.runModal() == .OK {
+            for url in panel.urls { settingsStore.importSound(from: url) }
+            soundLibraryVersion += 1
+            onReloadSounds?()
         }
     }
 

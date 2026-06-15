@@ -57,27 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsStore.$soundVolume
             .sink { [weak self] volume in self?.soundEngine.setVolume(volume) }
             .store(in: &cancellables)
-        settingsStore.$soundSessionStart
-            .sink { [weak self] on in
-                self?.soundEngine.setEventEnabled(.sessionStart, enabled: on)
-                self?.soundEngine.setEventEnabled(.sessionEnd, enabled: on)
-            }
-            .store(in: &cancellables)
-        settingsStore.$soundCompletion
-            .sink { [weak self] on in self?.soundEngine.setEventEnabled(.completion, enabled: on) }
-            .store(in: &cancellables)
-        settingsStore.$soundToolUse
-            .sink { [weak self] on in self?.soundEngine.setEventEnabled(.toolUse, enabled: on) }
-            .store(in: &cancellables)
-        settingsStore.$soundError
-            .sink { [weak self] on in self?.soundEngine.setEventEnabled(.error, enabled: on) }
-            .store(in: &cancellables)
-        settingsStore.$soundPermission
-            .sink { [weak self] on in
-                self?.soundEngine.setEventEnabled(.approvalNeeded, enabled: on)
-                self?.soundEngine.setEventEnabled(.approvalGranted, enabled: on)
-                self?.soundEngine.setEventEnabled(.approvalDenied, enabled: on)
-            }
+        // Per-event sound assignments (Default / Off / a library file). The
+        // @Published publisher emits the current value on subscribe, so this
+        // also applies the initial assignments at startup.
+        settingsStore.$soundAssignments
+            .sink { [weak self] map in self?.soundEngine.applyAssignments(map) }
             .store(in: &cancellables)
 
         // Create notch window
@@ -101,6 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sessionStore: sessionStore,
             updateChecker: updateChecker,
             onReloadSounds: { [weak self] in self?.soundEngine.reloadSounds() },
+            onPreviewEvent: { [weak self] ev in self?.soundEngine.preview(ev) },
+            onPreviewFile: { [weak self] name in self?.soundEngine.previewFile(name) },
             onShowWhatsNew: { [weak self] in self?.showWhatsNew() },
             onQuit: { NSApp.terminate(nil) }
         )
