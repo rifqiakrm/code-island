@@ -51,12 +51,49 @@ struct MarkdownText: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(codeBackground.opacity(0.5)))
+                case .header(let level, let title):
+                    Text(Self.inline(title))
+                        .font(.system(size: Self.headerSize(level, base: fontSize), weight: .bold))
+                        .foregroundColor(color)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, level <= 2 ? 2 : 0)
+                        .textSelection(.enabled)
+                case .quote(let q):
+                    HStack(alignment: .top, spacing: 8) {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(color.opacity(0.4))
+                            .frame(width: 3)
+                        Text(Self.inline(q))
+                            .font(.system(size: fontSize))
+                            .foregroundColor(color.opacity(0.75))
+                            .italic()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
     }
 
-    enum Block { case code(String); case text(String); case table(headers: [String], rows: [[String]]) }
+    private static func headerSize(_ level: Int, base: CGFloat) -> CGFloat {
+        switch level {
+        case 1: return base + 6   // 17 at base 11
+        case 2: return base + 3.5
+        case 3: return base + 2
+        default: return base + 1
+        }
+    }
+
+    enum Block {
+        case code(String)
+        case text(String)
+        case table(headers: [String], rows: [[String]])
+        case header(level: Int, text: String)
+        case quote(String)
+    }
 
     /// Split into fenced-code blocks vs prose blocks.
     static func blocks(from text: String) -> [Block] {
@@ -97,6 +134,7 @@ struct MarkdownText: View {
         var i = 0
         while i < lines.count {
             let line = lines[i]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
             // A table = a row with "|" immediately followed by a |---|--- separator.
             if line.contains("|"), i + 1 < lines.count, isTableSeparator(lines[i + 1]) {
                 flushPara()
@@ -110,6 +148,27 @@ struct MarkdownText: View {
                     i += 1
                 }
                 out.append(.table(headers: headers, rows: rows))
+                continue
+            }
+            // ATX header (#, ##, …) → its own sized block.
+            if let r = trimmed.range(of: #"^#{1,6}\s+"#, options: .regularExpression) {
+                flushPara()
+                let level = trimmed.prefix(while: { $0 == "#" }).count
+                out.append(.header(level: level, text: String(trimmed[r.upperBound...])))
+                i += 1
+                continue
+            }
+            // Blockquote — consume consecutive `>` lines.
+            if trimmed.hasPrefix(">") {
+                flushPara()
+                var quoted: [String] = []
+                while i < lines.count, lines[i].trimmingCharacters(in: .whitespaces).hasPrefix(">") {
+                    var q = lines[i].trimmingCharacters(in: .whitespaces)
+                    q.removeFirst()                              // drop leading ">"
+                    quoted.append(q.trimmingCharacters(in: .whitespaces))
+                    i += 1
+                }
+                out.append(.quote(quoted.joined(separator: "\n")))
                 continue
             }
             para.append(line)
@@ -141,6 +200,12 @@ struct MarkdownText: View {
             var line = String(raw)
             if let m = line.range(of: #"^\s{0,3}#{1,6}\s+"#, options: .regularExpression) {
                 return "**" + line[m.upperBound...].trimmingCharacters(in: .whitespaces) + "**"
+            }
+            // Task list: `- [x]` / `- [ ]` → ☑ / ☐ (check before the bullet rule).
+            if let r = line.range(of: #"^(\s*)[-*+]\s+\[[ xX]\]\s+"#, options: .regularExpression) {
+                let indent = line.prefix(while: { $0 == " " })
+                let checked = line.contains("[x]") || line.contains("[X]")
+                return indent + (checked ? "☑ " : "☐ ") + String(line[r.upperBound...])
             }
             line = line.replacingOccurrences(of: #"^(\s*)[-*+]\s+"#, with: "$1• ", options: .regularExpression)
             return line
