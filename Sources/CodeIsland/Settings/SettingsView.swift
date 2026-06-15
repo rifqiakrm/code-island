@@ -320,6 +320,8 @@ struct SettingsView: View {
             Text("Gemini, Cursor, Copilot, Kimi, AntiGravity, and Hermes have no selective permission prompt — only blanket \"before every tool\" hooks. Turn one on to pause that agent on every tool call for in-notch approval. Off by default: when on you'll be prompted a lot, and if you don't answer before the hook times out (~5 min) the action proceeds. (Hermes also keeps its own prompt for dangerous commands.)")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
 
         Section("Updates") {
@@ -389,6 +391,8 @@ struct SettingsView: View {
             Text(settingsStore.notchThemeID.blurb)
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -457,6 +461,8 @@ struct SettingsView: View {
             Text("Import .wav / .mp3 / .m4a / .aiff / .caf, then pick it for any event above. Default = the built-in 8-bit chime.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -628,6 +634,8 @@ struct SettingsView: View {
             Text("Hooks auto-install every time Code Island launches. Use these buttons only if you need to refresh or re-pair after deleting config files.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
 
         Section("Bridge") {
@@ -676,6 +684,8 @@ struct SettingsView: View {
             Text("Code Island is free & open source. If you'd like to support development, it's hugely appreciated — and totally optional. ♥")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
