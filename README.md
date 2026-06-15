@@ -31,6 +31,7 @@
 - **Finished notifications** — see the agent's reply inline when a task completes
 - **Per-provider rate limits** — 5h / 7d usage with color-coded warnings; tap to cycle providers
 - **Permission queue** — multiple agents' permissions queue automatically
+- **Claude multi-profile** — auto-installs into `~/.claude` *and* every `~/.claude-*` profile (`CLAUDE_CONFIG_DIR` targets); sessions are labeled by profile (e.g. `work` / `personal`)
 - **Terminal jump** — click a session card to jump back to the terminal/IDE running it
 - **Dynamic terminal detection** — iTerm2, Ghostty, Terminal.app, VS Code, JetBrains, Codex.app, and more
 - **8-bit sound effects** — per-event toggles with optional custom sound packs
