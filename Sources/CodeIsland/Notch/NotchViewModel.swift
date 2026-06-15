@@ -25,7 +25,10 @@ final class NotchViewModel: ObservableObject {
     // top areas). Width extends ~50pt beyond the notch on each side so the
     // mascot and session count have room. Height is notch height + small buffer.
     static var collapsedSize: NSSize {
-        guard ScreenDetector.hasNotch else { return NSSize(width: 280, height: 5) }
+        // No hardware notch (external display / older Mac): render a real bar
+        // hanging from the top-center instead of a 5pt hover sliver, which read
+        // as "smushed". NotchShape gives it the flat-top/rounded-bottom look.
+        guard ScreenDetector.hasNotch else { return NSSize(width: 230, height: 32) }
         let width = max(280, ScreenDetector.notchWidth + 100)
         let height = ScreenDetector.notchHeight
         return NSSize(width: width, height: height)
