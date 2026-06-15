@@ -34,7 +34,7 @@
 - **Claude multi-profile** — auto-installs into `~/.claude` *and* every `~/.claude-*` profile (`CLAUDE_CONFIG_DIR` targets); sessions are labeled by profile (e.g. `work` / `personal`)
 - **Terminal jump** — click a session card to jump back to the terminal/IDE running it
 - **Dynamic terminal detection** — iTerm2, Ghostty, Terminal.app, VS Code, JetBrains, Codex.app, and more
-- **8-bit sound effects** — per-event toggles with optional custom sound packs
+- **8-bit sound effects** — per-event sound picker (built-in chime / off / your own), an in-app sound library with an "Add Sound…" importer, and ▶ previews
 - **Pixel-art mascots** — every agent gets its own hand-drawn pixel mascot that animates by status
 - **Notch themes** — 5 looks (Default, Liquid Glass, Retro Pixel, Terminal, Neo-Brutalist), switch live in Settings → Appearance
 
