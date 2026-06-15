@@ -15,15 +15,49 @@ enum HookInstaller {
 
     @discardableResult
     static func install() -> Bool {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let settingsPath = home.appendingPathComponent(".claude/settings.json")
+        installBridgeLauncher()   // shared launcher, once
+        // Install into the default ~/.claude AND every detected ~/.claude-*
+        // profile dir (CLAUDE_CONFIG_DIR targets — Claude reads hooks from each
+        // profile's own settings.json). One bad profile doesn't fail the rest.
+        var ok = true
+        for dir in claudeProfileDirs() {
+            if !installHooks(intoClaudeDir: dir) { ok = false }
+        }
+        return ok
+    }
 
-        // Create ~/.claude/ dir if needed
-        let claudeDir = home.appendingPathComponent(".claude")
+    /// The default `~/.claude` plus any sibling `~/.claude-*` directories that
+    /// carry real Claude config (a `settings.json`, `.credentials.json`, or
+    /// `projects/`). These are the per-profile `CLAUDE_CONFIG_DIR` targets.
+    static func claudeProfileDirs() -> [URL] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let fm = FileManager.default
+        var dirs = [home.appendingPathComponent(".claude")]   // default, always
+        let markers = ["settings.json", ".credentials.json", "projects"]
+        if let entries = try? fm.contentsOfDirectory(
+            at: home, includingPropertiesForKeys: [.isDirectoryKey], options: []) {
+            for url in entries {
+                let name = url.lastPathComponent
+                guard name.hasPrefix(".claude-"),
+                      (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
+                      markers.contains(where: { fm.fileExists(atPath: url.appendingPathComponent($0).path) })
+                else { continue }
+                dirs.append(url)
+            }
+        }
+        return dirs
+    }
+
+    @discardableResult
+    private static func installHooks(intoClaudeDir claudeDir: URL) -> Bool {
+        let settingsPath = claudeDir.appendingPathComponent("settings.json")
+
+        // Create the profile dir if needed (the default ~/.claude may not exist
+        // yet; detected ~/.claude-* dirs already do).
         do {
             try FileManager.default.createDirectory(at: claudeDir, withIntermediateDirectories: true)
         } catch {
-            Log.error("HookInstaller: can't create ~/.claude: \(error)")
+            Log.error("HookInstaller: can't create \(claudeDir.path): \(error)")
             return false
         }
 
@@ -61,7 +95,7 @@ enum HookInstaller {
             "Stop", "SubagentStart", "SubagentStop", "PreCompact",
         ]
 
-        let bridgeCommand = home.path + "/.code-island/bin/code-island-bridge"
+        let bridgeCommand = FileManager.default.homeDirectoryForCurrentUser.path + "/.code-island/bin/code-island-bridge"
 
         let permissionHookEvents = ["PermissionRequest"]
 
@@ -84,8 +118,7 @@ enum HookInstaller {
             return false
         }
         if let existing = existingData, normalizedJSON(existing) == normalizedJSON(newData) {
-            installBridgeLauncher()
-            return true
+            return true   // unchanged — don't dirty the file
         }
 
         // Back up existing file before overwriting
@@ -101,10 +134,7 @@ enum HookInstaller {
             return false
         }
 
-        // Install bridge launcher script
-        installBridgeLauncher()
-
-        print("[CodeIsland] Hooks installed successfully")
+        print("[CodeIsland] Hooks installed at \(settingsPath.path)")
         return true
     }
 

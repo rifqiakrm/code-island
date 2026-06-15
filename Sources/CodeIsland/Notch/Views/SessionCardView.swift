@@ -38,6 +38,17 @@ struct SessionCardView: View {
                     .font(theme.font(size: 13, weight: .heavy))
                     .foregroundColor(theme.cardForeground)
                     .lineLimit(1)
+                if let profile = session.profile {
+                    Text(profile)
+                        .font(theme.font(size: 8, weight: .heavy))
+                        .tracking(0.5)
+                        .foregroundColor(session.provider.accentColor)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule().fill(session.provider.accentColor.opacity(0.16))
+                        )
+                }
                 if let effort = session.effortLevel {
                     EffortBadge(level: effort)
                 }

@@ -103,6 +103,9 @@ struct Session: Identifiable {
     /// Model the agent is currently using, captured from any hook with a
     /// `model` field. Shortened by `shortModelName` for display.
     var model: String?
+    /// Claude multi-profile label (e.g. "work" from ~/.claude-work). nil for
+    /// the default ~/.claude profile.
+    var profile: String?
     /// AI provider identifier (claude / codex / gemini / ...).
     /// Defaults to "claude" if the bridge doesn't stamp a source.
     var source: String = "claude"

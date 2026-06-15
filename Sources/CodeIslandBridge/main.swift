@@ -476,6 +476,18 @@ if let toolNewString { message["tool_new_string"] = toolNewString }
 // the session can be removed from the notch.
 message["agent_pid"] = Int(getppid())
 if !envVars.isEmpty { message["_env"] = envVars }
+// Claude multi-profile: when launched with a custom CLAUDE_CONFIG_DIR (e.g.
+// ~/.claude-work), tag the session with the profile name ("work") so the notch
+// can tell profiles apart. The hook subprocess inherits CLAUDE_CONFIG_DIR.
+if providerSource == "claude",
+   let cfgDir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"], !cfgDir.isEmpty {
+    var base = (cfgDir as NSString).lastPathComponent
+    if base != ".claude" {
+        if base.hasPrefix(".claude-") { base = String(base.dropFirst(8)) }   // ".claude-".count
+        else if base.hasPrefix(".") { base = String(base.dropFirst()) }
+        if !base.isEmpty { message["profile"] = base }
+    }
+}
 if let userMessage { message["user_message"] = userMessage }
 if let assistantMessage { message["assistant_message"] = assistantMessage }
 if let permMode = payload["permission_mode"] as? String { message["permission_mode"] = permMode }

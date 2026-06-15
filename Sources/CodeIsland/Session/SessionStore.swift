@@ -223,6 +223,10 @@ final class SessionStore: ObservableObject {
         if let title = message.sessionTitle, !title.isEmpty {
             sessions[sessionId]?.sessionTitle = title
         }
+        // Claude multi-profile label (~/.claude-work → "work").
+        if let profile = message.profile, !profile.isEmpty {
+            sessions[sessionId]?.profile = profile
+        }
         // Capture the agent PID — used to detect when the agent exits.
         // Also stamp its start time so PID reuse can be detected later
         // (issue #29).

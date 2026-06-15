@@ -29,6 +29,9 @@ struct BridgeMessage: Codable {
     /// Captured straight from the hook payload's `model` field — both
     /// Claude and Codex emit it.
     let model: String?
+    /// Claude multi-profile label, derived by the bridge from a custom
+    /// CLAUDE_CONFIG_DIR (e.g. ~/.claude-work → "work"). nil for the default.
+    let profile: String?
 
     var terminalInfo: TerminalInfo? {
         guard let env else { return nil }
@@ -64,6 +67,7 @@ struct BridgeMessage: Codable {
         case source
         case agentPid = "agent_pid"
         case model
+        case profile
     }
 }
 
