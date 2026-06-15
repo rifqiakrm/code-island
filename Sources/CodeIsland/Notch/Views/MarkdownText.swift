@@ -30,12 +30,33 @@ struct MarkdownText: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
+                case .table(let headers, let rows):
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+                        GridRow {
+                            ForEach(headers.indices, id: \.self) { i in
+                                Text(Self.inline(headers[i])).bold()
+                            }
+                        }
+                        Divider().background(color.opacity(0.25))
+                        ForEach(rows.indices, id: \.self) { r in
+                            GridRow {
+                                ForEach(rows[r].indices, id: \.self) { c in
+                                    Text(Self.inline(rows[r][c]))
+                                }
+                            }
+                        }
+                    }
+                    .font(.system(size: fontSize))
+                    .foregroundColor(color)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(codeBackground.opacity(0.5)))
                 }
             }
         }
     }
 
-    enum Block { case code(String); case text(String) }
+    enum Block { case code(String); case text(String); case table(headers: [String], rows: [[String]]) }
 
     /// Split into fenced-code blocks vs prose blocks.
     static func blocks(from text: String) -> [Block] {
@@ -44,8 +65,7 @@ struct MarkdownText: View {
         var code: [String] = []
         var inCode = false
         func flushProse() {
-            let s = prose.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-            if !s.isEmpty { blocks.append(.text(s)) }
+            blocks.append(contentsOf: proseBlocks(prose))
             prose = []
         }
         for line in text.components(separatedBy: "\n") {
@@ -63,6 +83,54 @@ struct MarkdownText: View {
         if inCode, !code.isEmpty { blocks.append(.code(code.joined(separator: "\n"))) }
         flushProse()
         return blocks
+    }
+
+    /// Split prose lines into paragraphs and pipe-tables.
+    static func proseBlocks(_ lines: [String]) -> [Block] {
+        var out: [Block] = []
+        var para: [String] = []
+        func flushPara() {
+            let s = para.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !s.isEmpty { out.append(.text(s)) }
+            para = []
+        }
+        var i = 0
+        while i < lines.count {
+            let line = lines[i]
+            // A table = a row with "|" immediately followed by a |---|--- separator.
+            if line.contains("|"), i + 1 < lines.count, isTableSeparator(lines[i + 1]) {
+                flushPara()
+                let headers = tableCells(line)
+                var rows: [[String]] = []
+                i += 2
+                while i < lines.count,
+                      lines[i].contains("|"),
+                      !lines[i].trimmingCharacters(in: .whitespaces).isEmpty {
+                    rows.append(tableCells(lines[i]))
+                    i += 1
+                }
+                out.append(.table(headers: headers, rows: rows))
+                continue
+            }
+            para.append(line)
+            i += 1
+        }
+        flushPara()
+        return out
+    }
+
+    private static func isTableSeparator(_ s: String) -> Bool {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        guard t.contains("-"), t.allSatisfy({ "|-: ".contains($0) }) else { return false }
+        return t.contains("|") || t.filter({ $0 == "-" }).count >= 3
+    }
+
+    private static func tableCells(_ line: String) -> [String] {
+        var parts = line.split(separator: "|", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        if parts.first == "" { parts.removeFirst() }
+        if parts.last == "" { parts.removeLast() }
+        return parts
     }
 
     /// Inline markdown (bold/italic/`code`/links) preserving line breaks. Headers
