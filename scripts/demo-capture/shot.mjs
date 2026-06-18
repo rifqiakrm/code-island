@@ -13,7 +13,7 @@ await page.evaluate(({st,th}) => {
   window.setTimeout = () => 0;
   window.setInterval = () => 0;
   const shape = document.querySelector('.notch-shape');
-  const states = ['list','perm','question','finished','themes','mascots','jumpto','sound'];
+  const states = ['list','perm','question','finished','plan','themes','mascots','jumpto','sound'];
   const heights = { idle:36 };
   states.forEach(s=>{
     const el = shape.querySelector('.state-'+s); if(!el){heights[s]=380;return;}

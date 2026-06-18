@@ -212,7 +212,7 @@
               <button class="action-btn deny">✕ Deny</button>
               <button class="action-btn allow-once">✓ Allow Once</button>
               <button class="action-btn allow-all">⊕ Allow All</button>
-              <button class="action-btn bypass">⚡ Bypass</button>
+              <button class="action-btn auto">⏵⏵ Auto Mode</button>
             </div>
           </div>
 
@@ -335,6 +335,67 @@
 
             <div class="action-row single">
               <button class="action-btn done">✓ Dismiss</button>
+            </div>
+          </div>
+
+          <!-- STATE: PLAN (Claude ExitPlanMode) -->
+          <div class="notch-panel state state-plan">
+            <div class="panel-top">
+              <div class="rl">
+                <img src="assets/claude.png" alt="" width="12" height="12" />
+                <span class="rl-label">5h</span><span class="rl-val good">8%</span>
+                <span class="rl-sep">|</span>
+                <span class="rl-label">7d</span><span class="rl-val good">39%</span>
+              </div>
+              <div class="panel-icons">
+                <svg class="sf-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M3 10a1 1 0 011-1h3l4-3.2v12.4L7 15H4a1 1 0 01-1-1v-4zm12 4.6a3 3 0 000-5.2v5.2zm0-8.4a6.5 6.5 0 010 11.6v-1.8a4.7 4.7 0 000-8v-1.8z"/>
+                </svg>
+                <svg class="sf-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 5.5a2 2 0 110-4 2 2 0 010 4zM10.7 2l-.4 2.1-1.3.5-1.8-1.2-1.8 1.8 1.2 1.8-.5 1.3L4 8.7v2.6l2.1.4.5 1.3-1.2 1.8 1.8 1.8 1.8-1.2 1.3.5.4 2.1h2.6l.4-2.1 1.3-.5 1.8 1.2 1.8-1.8-1.2-1.8.5-1.3 2.1-.4V8.7l-2.1-.4-.5-1.3 1.2-1.8-1.8-1.8-1.8 1.2-1.3-.5-.4-2.1h-2.6z"/>
+                </svg>
+              </div>
+            </div>
+
+            <div class="perm-head">
+              <svg class="mascot pixel-mascot" viewBox="0 0 66 52" aria-hidden="true">
+                <g fill="#d97757">
+                  <rect x="0"  y="13" width="6"  height="13"/><rect x="60" y="13" width="6"  height="13"/>
+                  <rect x="6"  y="39" width="6" height="13"/><rect x="18" y="39" width="6" height="13"/>
+                  <rect x="42" y="39" width="6" height="13"/><rect x="54" y="39" width="6" height="13"/>
+                  <rect x="6" y="0" width="54" height="39"/>
+                </g>
+                <g fill="#1a0a0a"><rect x="12" y="13" width="6" height="7"/><rect x="48" y="13" width="6" height="7"/></g>
+              </svg>
+              <span class="card-title">memory-backup</span>
+              <span class="pill-needs plan">≣ Plan ready</span>
+            </div>
+
+            <div class="plan-md">
+              <div class="plan-md-head"><span>&lt;/&gt; plan</span><span>~/.claude/plans/…torvalds.md</span></div>
+              <div class="plan-md-body">
+                <h4>Plan: <code>memory_backup.py</code> — snapshot the memory store</h4>
+                <p class="md-h">Context</p>
+                <p>Auto-memory is mutated in place every session — no history. This adds timestamped, compressed snapshots so the store is always recoverable.</p>
+                <p class="md-h">Behavior</p>
+                <ul>
+                  <li>Write <code>memory-YYYYMMDD.tar.gz</code> of the store</li>
+                  <li>Prune all but the newest <code>--keep</code></li>
+                  <li><code>--dry-run</code> reports without writing</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="action-row">
+              <button class="action-btn auto">⏵⏵ Approve &amp; auto mode</button>
+              <button class="action-btn allow-all">✎ Approve &amp; manual edits</button>
+            </div>
+            <div class="plan-foot">
+              <button class="action-btn ghost-btn">
+                <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" style="width:11px;height:11px;display:inline;vertical-align:-1px;margin-right:4px"><path d="M2 3h12v10H2V3zm2 2v6h8V5H4zm1 1l2 2-2 2V6zm3 3h4v1H8V9z"/></svg>
+                Answer in terminal
+              </button>
+              <button class="action-btn keep">↩ Keep planning</button>
             </div>
           </div>
 
@@ -824,6 +885,8 @@ swift build -c release
         { state: 'idle',     label: 'Idle',       hold: 800  },
         { state: 'finished', label: 'Finished',   hold: 3400 },
         { state: 'idle',     label: 'Idle',       hold: 800  },
+        { state: 'plan',     label: 'Plan mode',  hold: 4600 },
+        { state: 'idle',     label: 'Idle',       hold: 800  },
         { state: 'themes',   label: 'Themes',     hold: 7600 },
         { state: 'idle',     label: 'Idle',       hold: 800  },
         { state: 'mascots',  label: '17 mascots', hold: 3800 },
@@ -838,6 +901,8 @@ swift build -c release
         { state: 'idle',     label: 'Idle',       hold: 500  },
         { state: 'perm',     label: 'Permission', hold: 2800 },
         { state: 'idle',     label: 'Idle',       hold: 500  },
+        { state: 'plan',     label: 'Plan mode',  hold: 3800 },
+        { state: 'idle',     label: 'Idle',       hold: 500  },
         { state: 'themes',   label: 'Themes',     hold: 5700 },
         { state: 'idle',     label: 'Idle',       hold: 500  },
         { state: 'mascots',  label: '17 mascots', hold: 2900 },
@@ -851,6 +916,7 @@ swift build -c release
         { state: 'list',     head: 'Every session.<br>One glance.',     hold: 3800 },
         { state: 'perm',     head: 'Approve without<br>leaving flow.',  hold: 3800 },
         { state: 'finished', head: 'Know the moment<br>it ships.',      hold: 3400 },
+        { state: 'plan',     head: 'See the plan,<br>not the JSON.',     hold: 4400 },
         { state: 'themes',   head: 'Five looks.<br>Your vibe.',         hold: 7600 },
         { state: 'mascots',  head: '17 agents.<br>17 mascots.',         hold: 3900 },
         { state: 'jumpto',   head: 'One click<br>to your terminal.',    hold: 3800 },
