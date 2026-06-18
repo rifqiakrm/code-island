@@ -688,7 +688,9 @@ code { overflow-wrap: anywhere; }
 .plan-md-body ul { margin: 2px 0 0; padding-left: 16px; }
 .plan-md-body li { font-size: 11.5px; line-height: 1.55; color: rgba(255, 255, 255, 0.72); }
 .plan-md-body code { background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 4px; font-size: 10.5px; color: var(--accent-2); font-family: 'JetBrains Mono', monospace; }
-.plan-foot { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 6px; }
+.action-row.plan-approve { grid-template-columns: 1fr 1fr; }
+.action-row.plan-approve .action-btn { padding: 11px 8px; }
+.plan-foot { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 8px; }
 .plan-foot .keep { justify-self: end; padding: 9px 16px; }
 
 /* QUESTION-specific — matches actual app */
