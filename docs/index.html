@@ -853,20 +853,35 @@ swift build -c release
       if (!shape) return;
 
       // Measure each state's natural content height by briefly making it visible.
+      // Re-measured once webfonts load: prose-heavy panels (the plan view) wrap
+      // differently under the fallback font and would otherwise over-measure,
+      // leaving a black gap below the content (perm/question have no wrapping
+      // prose, so they were never affected).
       const heights = { idle: 36 };
-      ['list', 'perm', 'question', 'plan', 'finished', 'themes', 'mascots', 'jumpto', 'sound'].forEach(s => {
-        const el = shape.querySelector('.state-' + s);
-        if (!el) { heights[s] = 380; return; }
-        const prev = { opacity: el.style.opacity, vis: el.style.visibility, pos: el.style.position };
-        el.style.opacity = '0';
-        el.style.visibility = 'hidden';
-        el.style.position = 'absolute';
-        // offsetHeight reflects the rendered height including padding
-        heights[s] = el.offsetHeight + 4;
-        el.style.opacity = prev.opacity;
-        el.style.visibility = prev.vis;
-        el.style.position = prev.pos;
-      });
+      function measureHeights() {
+        ['list', 'perm', 'question', 'plan', 'finished', 'themes', 'mascots', 'jumpto', 'sound'].forEach(s => {
+          const el = shape.querySelector('.state-' + s);
+          if (!el) { heights[s] = 380; return; }
+          const prev = { opacity: el.style.opacity, vis: el.style.visibility, pos: el.style.position };
+          el.style.opacity = '0';
+          el.style.visibility = 'hidden';
+          el.style.position = 'absolute';
+          // offsetHeight reflects the rendered height including padding
+          heights[s] = el.offsetHeight + 4;
+          el.style.opacity = prev.opacity;
+          el.style.visibility = prev.vis;
+          el.style.position = prev.pos;
+        });
+      }
+      measureHeights();
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+          measureHeights();
+          if (shape.dataset.state && heights[shape.dataset.state]) {
+            shape.style.height = heights[shape.dataset.state] + 'px';
+          }
+        });
+      }
 
       const params = new URLSearchParams(location.search);
       const short = params.has('short');     // ?short → ~20s highlight cut
