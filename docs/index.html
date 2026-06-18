@@ -885,7 +885,8 @@ swift build -c release
 
       const params = new URLSearchParams(location.search);
       const short = params.has('short');     // ?short → ~20s highlight cut
-      const cine = params.has('cine');       // ?cine  → Apple-style headlines + cards
+      const planad = params.has('planad');   // ?planad → plan-mode-only Apple-style ad
+      const cine = params.has('cine') || planad; // ?cine → Apple-style headlines + cards
       const themeInterval = short ? 1100 : 1500;
 
       // Full reel (~40s, all 8 states) vs short highlight cut (~22s, the most
@@ -938,7 +939,23 @@ swift build -c release
         { state: 'sound',    head: 'A chirp for<br>every beat.',        hold: 3400 },
         { card: 'outro',                                                hold: 4200 },
       ];
-      const seq = cine ? cineSeq : (short ? shortSeq : fullSeq);
+      // Plan-mode commercial — plan window is the hero (longer dwell + big
+      // headlines), then a quick montage of the rest of the notch, Apple style.
+      const planAdSeq = [
+        { card: 'planIntro',                                            hold: 2800 },
+        { state: 'plan', head: 'Claude writes<br>a plan.',              hold: 3000 },
+        { state: 'plan', head: 'Read it as markdown —<br>not raw JSON.',hold: 3600 },
+        { state: 'plan', head: 'Approve into<br>⏵⏵ auto mode.',         hold: 3400 },
+        { card: 'more',                                                 hold: 1700 },
+        { state: 'list',    head: 'Every session.',          hold: 1900 },
+        { state: 'perm',    head: 'Approve in a tap.',       hold: 1900 },
+        { state: 'themes',  head: 'Five looks.',             hold: 3000 },
+        { state: 'mascots', head: '17 mascots.',             hold: 2100 },
+        { state: 'jumpto',  head: 'Jump to your terminal.',  hold: 2100 },
+        { state: 'sound',   head: 'A chirp for every beat.', hold: 2000 },
+        { card: 'outro',                                                hold: 4200 },
+      ];
+      const seq = planad ? planAdSeq : (cine ? cineSeq : (short ? shortSeq : fullSeq));
 
       // Total loop length (sum of holds) — used by the offline recorder.
       window.__loopMs = seq.reduce((a, s) => a + s.hold, 0);
@@ -1002,6 +1019,8 @@ swift build -c release
 
       const CARDS = {
         intro: '<img src="assets/logo.png" alt=""/><div class="ct">Code Island</div><div class="cs">your notch, reimagined.</div>',
+        planIntro: '<img src="assets/logo.png" alt=""/><div class="ct">Plan mode</div><div class="cs">review before you run.</div>',
+        more: '<div class="ct">More in<br>your notch.</div>',
         outro: '<img src="assets/logo.png" alt=""/><div class="ct">Code Island</div><div class="cs">17 AI coding agents · one notch</div><div class="cu">free &amp; open source — github.com/rifqiakrm/code-island</div>',
       };
 
