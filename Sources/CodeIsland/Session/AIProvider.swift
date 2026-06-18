@@ -175,7 +175,10 @@ struct AIProvider: Identifiable, Hashable {
     /// allow/deny/defer; Gemini/Kimi only allow/deny.
     var permissionActions: [PermissionAction] {
         switch id {
-        case "claude", "codex":          return [.deny, .allowOnce, .allowAll, .bypass]
+        // Claude's 4th action is "Auto Mode" (acceptEdits). Codex keeps "Bypass"
+        // (a broad prefix_rule) — it has no acceptEdits-style mode.
+        case "claude":                   return [.deny, .allowOnce, .allowAll, .autoMode]
+        case "codex":                    return [.deny, .allowOnce, .allowAll, .bypass]
         case "qwen", "opencode":         return [.deny, .allowOnce, .allowAll]
         case "cursor", "copilot":        return [.deny, .allowOnce, .deferToApp]
         default:                         return [.deny, .allowOnce]   // gemini, kimi, forks, pi, kiro, …

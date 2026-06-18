@@ -6,6 +6,7 @@ enum NotchState: Equatable {
     case expanded
     case finished(sessionId: String)
     case permission(sessionId: String)
+    case plan(sessionId: String)
     case question(sessionId: String)
 }
 
@@ -39,6 +40,8 @@ final class NotchViewModel: ObservableObject {
     static let permissionSize = NSSize(width: 600, height: 380)
     // Question: taller for multiple questions
     static let questionSize = NSSize(width: 600, height: 480)
+    // Plan review (ExitPlanMode): tall, markdown scrolls inside
+    static let planSize = NSSize(width: 600, height: 520)
 
     // Finished notification: compact, just one card
     static let finishedSize = NSSize(width: 600, height: 380)
@@ -57,6 +60,8 @@ final class NotchViewModel: ObservableObject {
             return NSSize(width: 600, height: dynamicFinishedHeight ?? Self.finishedSize.height)
         case .permission:
             return NSSize(width: 600, height: dynamicPermissionHeight ?? Self.permissionSize.height)
+        case .plan:
+            return Self.planSize
         case .question:
             return Self.questionSize
         }
@@ -176,6 +181,15 @@ final class NotchViewModel: ObservableObject {
         state = .collapsed
     }
 
+    func showPlan(sessionId: String) {
+        autoCollapseTask?.cancel()
+        state = .plan(sessionId: sessionId)
+    }
+
+    func dismissPlan() {
+        state = .collapsed
+    }
+
     func showQuestion(sessionId: String) {
         autoCollapseTask?.cancel()
         state = .question(sessionId: sessionId)
@@ -210,9 +224,9 @@ final class NotchViewModel: ObservableObject {
 
     func mouseExited() {
         isHovered = false
-        // Never auto-collapse permission or question states — user must respond
+        // Never auto-collapse permission/plan/question states — user must respond
         switch state {
-        case .permission, .question:
+        case .permission, .plan, .question:
             return
         default:
             break

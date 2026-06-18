@@ -93,6 +93,7 @@ final class NotchWindowController: NSWindowController {
             // (issue #7).
             let isAlreadyDeciding: Bool = {
                 if case .permission = viewModel.state { return true }
+                if case .plan = viewModel.state { return true }
                 if case .question = viewModel.state { return true }
                 return false
             }()
@@ -102,6 +103,9 @@ final class NotchWindowController: NSWindowController {
                 guard !isAlreadyDeciding else { return }
                 let height = computePermissionHeight(sessionId: sessionId)
                 viewModel.showPermission(sessionId: sessionId, contentHeight: height)
+            case .planRequested(let sessionId):
+                guard !isAlreadyDeciding else { return }
+                viewModel.showPlan(sessionId: sessionId)
             case .questionAsked(let sessionId):
                 guard !isAlreadyDeciding else { return }
                 viewModel.showQuestion(sessionId: sessionId)
@@ -112,14 +116,19 @@ final class NotchWindowController: NSWindowController {
                     viewModel.showFinished(sessionId: sessionId, contentHeight: height)
                 }
             case .pendingDismissedExternally(let sessionId):
-                // Permission/question was answered in the terminal — dismiss the notch
+                // Permission/plan/question was answered in the terminal — dismiss
                 switch viewModel.state {
                 case .permission(let id) where id == sessionId,
+                     .plan(let id) where id == sessionId,
                      .question(let id) where id == sessionId:
                     // Show next pending if any, else collapse
                     if let next = sessionStore.nextPendingPermission() {
-                        let h = sessionStore.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
-                        viewModel.showPermission(sessionId: next, contentHeight: h)
+                        if sessionStore.sessions[next]?.pendingPermission?.isPlan == true {
+                            viewModel.showPlan(sessionId: next)
+                        } else {
+                            let h = sessionStore.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
+                            viewModel.showPermission(sessionId: next, contentHeight: h)
+                        }
                     } else if let next = sessionStore.nextPendingQuestion() {
                         viewModel.showQuestion(sessionId: next)
                     } else {

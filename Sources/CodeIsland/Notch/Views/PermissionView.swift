@@ -185,6 +185,11 @@ struct PermissionView: View {
         case .allowAll:   return ("checkmark.circle", "Allow All", Color(red: 0.55, green: 0.78, blue: 0.55))
         case .bypass:     return ("bolt", "Bypass", Color(red: 0.70, green: 0.62, blue: 0.92))
         case .deferToApp: return ("arrow.up.forward.app", "Decide in \(provider.displayName)", Color(red: 0.70, green: 0.62, blue: 0.92))
+        case .autoMode:   return ("forward.fill", "Auto Mode", Color(red: 0.96, green: 0.72, blue: 0.25))
+        // Plan-only actions are rendered by PlanView with explicit labels; these
+        // exist for exhaustiveness and aren't surfaced by the permission card.
+        case .approvePlan:     return ("checkmark", "Approve", Color(red: 0.55, green: 0.78, blue: 0.55))
+        case .approvePlanAuto: return ("forward.fill", "Approve & auto-run", Color(red: 0.96, green: 0.72, blue: 0.25))
         }
     }
 

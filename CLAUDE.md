@@ -58,7 +58,9 @@ Each `Session.source` defaults to "claude" if the bridge doesn't stamp it. **The
 ## Permission Modes (Claude, mid-session setMode)
 
 - `bypassPermissions` — **cannot be set mid-session**, only at Claude Code startup via `--dangerously-skip-permissions`. Mid-session setMode requests are silently ignored.
-- `dontAsk` — works mid-session, suppresses future permission prompts for the session. This is what our "Bypass" button actually sends to Claude.
+- `auto` — works mid-session; Claude's amber **"⏵⏵ auto mode on"**. Runs everything without routine prompts, gated by a server-side safety classifier. This is what our **Auto Mode** button (`PermissionAction.autoMode`, the amber `forward.fill` 4th button) + the plan window's "Approve & auto-run" send (`allow` + `setMode auto`). A plain `allow` does NOT change the mode, so the setMode is required. **Not `acceptEdits`** — see below.
+- `acceptEdits` — narrower & separate: the purple **"⏵⏵ accept edits on"**. Auto-accepts file edits + common FS commands (`mkdir`/`mv`/…) but **still prompts for bash/network**. (We don't currently wire a button to this; the plan window's manual "Approve" uses `default`.)
+- `dontAsk` — works mid-session, suppresses *all* future prompts. No longer wired to a Claude button (it was the old "Bypass"); kept as the `BridgeResponse.bypass()` fallback. Codex's "Bypass" uses a broad `prefix_rule` instead.
 - `default` — normal mode, prompts for permissions.
 
 ## Codex Permission Persistence
@@ -142,7 +144,8 @@ Live-fetched over HTTP (not statusline anymore):
 - **Collapsed** — mascot left, session count right
 - **Expanded** (hover) — rate limit bar + sound toggle + settings gear + filter chips (when ≥2 providers active) + collapsible per-provider section list
 - **Finished** (Stop event) — rate limit bar + session card with scrollable response + Done button, auto-collapses in 3s
-- **Permission** — rate limit bar + tool details + **provider-aware buttons** (`AIProvider.permissionActions`): Claude/Codex get Deny·Allow Once·Allow All·Bypass; Qwen/Qoder/OpenCode drop Bypass; Cursor/Copilot show Deny·Allow Once·"Decide in <app>" (defers via behavior "ask" + jump); everyone else shows Deny·Allow Once. Showing a button the tool can't honor (silent no-op) is worse than omitting it.
+- **Permission** — rate limit bar + tool details + **provider-aware buttons** (`AIProvider.permissionActions`): Claude gets Deny·Allow Once·Allow All·**Auto Mode** (setMode `auto` — amber "⏵⏵ auto mode on"); Codex gets Deny·Allow Once·Allow All·Bypass (broad prefix_rule); Qwen/Qoder/OpenCode drop the 4th; Cursor/Copilot show Deny·Allow Once·"Decide in <app>" (defers via behavior "ask" + jump); everyone else shows Deny·Allow Once. Showing a button the tool can't honor (silent no-op) is worse than omitting it.
+- **Plan** (Claude `ExitPlanMode`) — dedicated `PlanView`: plan markdown rendered via `MarkdownText` (not the raw `{"plan":…}` JSON) + Approve & auto mode (`setMode auto`) · Approve & manual edits (`setMode default`) · Answer in terminal (ask) · Keep planning (deny) — order/labels mirror Claude's own plan prompt. Detected in `SessionStore` (`tool_name == "ExitPlanMode"`, `tool_input` is a JSON *string*), routed via the `.plan` notch state + `.planRequested` event.
 - **Question** — rate limit bar + all questions shown, pill buttons, multi-select (Claude only), Submit All Answers
 
 ## Theming

@@ -587,9 +587,9 @@ struct WhatsNewView: View {
         .init(symbol: "lock.shield", tint: Color(red: 0.37, green: 0.78, blue: 1.0),
               title: "“Review every action” mode",
               detail: "Optional strict approval for agents without a native prompt (Gemini, Cursor, Copilot, Kimi, AntiGravity) — Settings → General."),
-        .init(symbol: "hand.wave", tint: Self.accent,
-              title: "Refreshed onboarding",
-              detail: "A new welcome flow with a Back button, this What's New card, plus a pile of fixes."),
+        .init(symbol: "checklist", tint: Color(red: 0.55, green: 0.70, blue: 0.98),
+              title: "Plan mode, beautifully rendered",
+              detail: "Claude's plans show as formatted markdown in the notch — approve into ⏵⏵ auto mode, approve & review edits manually, keep planning, or answer in terminal."),
     ]
 
     var body: some View {

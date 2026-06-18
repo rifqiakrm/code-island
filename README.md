@@ -26,7 +26,8 @@
 
 - **17 AI coding agents** — Claude Code, Codex, Gemini, Qwen, Qoder, Factory, CodeBuddy, Cursor, Copilot, Kimi, OpenCode, Cline, Kiro, Pi, Oh My Pi, AntiGravity, and Hermes — side by side in one notch
 - **Live session tracking** — every running agent visible at a glance, grouped by provider
-- **Permission UI** — approve, deny, allow-all, or bypass from the notch without switching apps
+- **Permission UI** — approve, deny, allow-all, or flip into `⏵⏵ auto mode` from the notch without switching apps (Codex keeps a broad bypass)
+- **Plan review** — Claude's plan mode (`ExitPlanMode`) renders the plan as formatted **markdown** in the notch, not raw JSON; approve into `⏵⏵ auto mode`, approve & review edits manually, keep planning, or answer in terminal
 - **Question UI** — Claude's `AskUserQuestion` and Codex's `request_user_input` surfaced inline; click to answer (Claude) or jump to the app (Codex)
 - **Finished notifications** — see the agent's reply inline when a task completes
 - **Markdown replies** — agent responses render markdown in the notch: headers, **bold**/*italic*, `code` + fenced code blocks, tables, bullet/numbered/task lists, and blockquotes

@@ -28,6 +28,19 @@ enum PermissionAction: Hashable {
     /// Defer to the tool's own prompt (behavior "ask") and jump to it. Used by
     /// providers whose hooks only support allow/deny/ask (Cursor, Copilot).
     case deferToApp
+    /// ExitPlanMode: approve the plan, exit plan mode into the normal prompt-each-
+    /// edit mode (allow + setMode "default"). Plain allow keeps the session in
+    /// plan mode, so the setMode is required to actually exit.
+    case approvePlan
+    /// ExitPlanMode: approve the plan and start in `auto` mode (allow + setMode
+    /// "auto") — the terminal's "Yes, and use auto mode" (amber "⏵⏵ auto mode on").
+    case approvePlanAuto
+    /// Allow this call + switch the session into `auto` mode (allow + setMode
+    /// "auto") — Claude's amber "⏵⏵ auto mode on". Runs everything without routine
+    /// prompts, gated by a server-side safety classifier. Replaces the old dontAsk
+    /// "Bypass" on Claude's row. NB: this is NOT "acceptEdits" (the narrower,
+    /// purple "⏵⏵ accept edits on" — edits only, bash still prompts).
+    case autoMode
 }
 
 struct PendingPermission {
@@ -37,13 +50,22 @@ struct PendingPermission {
     let content: String?
     let oldString: String?
     let newString: String?
+    /// ExitPlanMode only: the proposed plan as markdown (rendered in PlanView).
+    let planMarkdown: String?
+    /// ExitPlanMode only: path to the saved plan `.md` file.
+    let planFilePath: String?
     let respond: (PermissionAction) -> Void
     /// Enqueue time. Used to surface oldest-first in the notch queue
     /// (deterministic FIFO across sessions) — issue #6.
     let requestedAt: Date
 
+    /// A plan-review request (Claude's ExitPlanMode) routes to PlanView instead
+    /// of the generic permission card.
+    var isPlan: Bool { planMarkdown != nil }
+
     init(toolName: String, description: String?, filePath: String?, content: String?,
          oldString: String?, newString: String?,
+         planMarkdown: String? = nil, planFilePath: String? = nil,
          respond: @escaping (PermissionAction) -> Void,
          requestedAt: Date = Date()) {
         self.toolName = toolName
@@ -52,6 +74,8 @@ struct PendingPermission {
         self.content = content
         self.oldString = oldString
         self.newString = newString
+        self.planMarkdown = planMarkdown
+        self.planFilePath = planFilePath
         self.respond = respond
         self.requestedAt = requestedAt
     }

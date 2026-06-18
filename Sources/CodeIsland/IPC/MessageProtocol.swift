@@ -138,6 +138,29 @@ struct BridgeResponse: Codable {
         return try? JSONSerialization.data(withJSONObject: response)
     }
 
+    /// Allow + switch the session into `mode` (setMode). Used to exit plan mode:
+    /// a plain allow keeps the session in `plan`, so approving ExitPlanMode must
+    /// carry the target mode ("default" = approve / "acceptEdits" = auto-run).
+    /// `bypassPermissions` is startup-only and won't take here.
+    static func allowWithMode(_ mode: String) -> Data? {
+        let response: [String: Any] = [
+            "hookSpecificOutput": [
+                "hookEventName": "PermissionRequest",
+                "decision": [
+                    "behavior": "allow",
+                    "updatedPermissions": [
+                        [
+                            "type": "setMode",
+                            "mode": mode,
+                            "destination": "session",
+                        ] as [String: Any],
+                    ],
+                ] as [String: Any],
+            ] as [String: Any],
+        ]
+        return try? JSONSerialization.data(withJSONObject: response)
+    }
+
     /// Bypass all permissions for the rest of this session using dontAsk mode
     /// (bypassPermissions can only be set at session startup, not mid-session)
     static func bypass() -> Data? {

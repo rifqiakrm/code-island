@@ -38,21 +38,34 @@ struct NotchContentView: View {
             if hovering {
                 viewModel.mouseEntered()
                 if case .collapsed = viewModel.state {
-                    // Check for pending permissions/questions first
-                    let store = sessionStore
-                    if let pending = store.nextPendingPermission() {
-                        let h = store.sessions[pending].map { NotchViewModel.permissionHeight(for: $0) }
-                        viewModel.showPermission(sessionId: pending, contentHeight: h)
-                    } else if let pending = store.nextPendingQuestion() {
-                        viewModel.showQuestion(sessionId: pending)
-                    } else {
-                        viewModel.expand()
-                    }
+                    // Surface a pending plan/permission/question first, else expand
+                    if !showNextPending() { viewModel.expand() }
                 }
             } else {
                 viewModel.mouseExited()
             }
         }
+    }
+
+    /// Surface the next queued decision (oldest-first): a plan routes to PlanView,
+    /// a regular permission to PermissionView, otherwise a question. Returns false
+    /// when nothing is pending so callers can fall back (collapse / expand).
+    @discardableResult
+    private func showNextPending() -> Bool {
+        let store = sessionStore
+        if let next = store.nextPendingPermission() {
+            if store.sessions[next]?.pendingPermission?.isPlan == true {
+                viewModel.showPlan(sessionId: next)
+            } else {
+                let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
+                viewModel.showPermission(sessionId: next, contentHeight: h)
+            }
+            return true
+        } else if let next = store.nextPendingQuestion() {
+            viewModel.showQuestion(sessionId: next)
+            return true
+        }
+        return false
     }
 
     @ViewBuilder
@@ -101,15 +114,7 @@ struct NotchContentView: View {
                     permission: pending,
                     onRespond: { action in
                         onPermissionRespond(sessionId, action)
-                        let store = sessionStore
-                        if let next = store.nextPendingPermission() {
-                            let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
-                            viewModel.showPermission(sessionId: next, contentHeight: h)
-                        } else if let next = store.nextPendingQuestion() {
-                            viewModel.showQuestion(sessionId: next)
-                        } else {
-                            viewModel.dismissPermission()
-                        }
+                        if !showNextPending() { viewModel.dismissPermission() }
                     },
                     rateLimitStore: rateLimitStore,
                     settingsStore: settingsStore,
@@ -127,6 +132,24 @@ struct NotchContentView: View {
                 CollapsedNotchView(sessionStore: sessionStore, rateLimitStore: rateLimitStore)
             }
 
+        case .plan(let sessionId):
+            if let session = sessionStore.sessions[sessionId],
+               let pending = session.pendingPermission, pending.isPlan {
+                PlanView(
+                    session: session,
+                    permission: pending,
+                    onRespond: { action in
+                        onPermissionRespond(sessionId, action)
+                        if !showNextPending() { viewModel.dismissPlan() }
+                    },
+                    rateLimitStore: rateLimitStore,
+                    settingsStore: settingsStore,
+                    onOpenSettings: onOpenSettings
+                )
+            } else {
+                CollapsedNotchView(sessionStore: sessionStore, rateLimitStore: rateLimitStore)
+            }
+
         case .question(let sessionId):
             if let session = sessionStore.sessions[sessionId],
                let question = session.pendingQuestion {
@@ -135,27 +158,11 @@ struct NotchContentView: View {
                     question: question,
                     onSubmit: { answers in
                         sessionStore.respondToQuestion(sessionId: sessionId, answersByQuestionId: answers)
-                        let store = sessionStore
-                        if let next = store.nextPendingPermission() {
-                            let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
-                            viewModel.showPermission(sessionId: next, contentHeight: h)
-                        } else if let next = store.nextPendingQuestion() {
-                            viewModel.showQuestion(sessionId: next)
-                        } else {
-                            viewModel.dismissQuestion()
-                        }
+                        if !showNextPending() { viewModel.dismissQuestion() }
                     },
                     onDeferToTerminal: {
                         sessionStore.deferQuestionToTerminal(sessionId: sessionId)
-                        let store = sessionStore
-                        if let next = store.nextPendingPermission() {
-                            let h = store.sessions[next].map { NotchViewModel.permissionHeight(for: $0) }
-                            viewModel.showPermission(sessionId: next, contentHeight: h)
-                        } else if let next = store.nextPendingQuestion() {
-                            viewModel.showQuestion(sessionId: next)
-                        } else {
-                            viewModel.dismissQuestion()
-                        }
+                        if !showNextPending() { viewModel.dismissQuestion() }
                     },
                     rateLimitStore: rateLimitStore,
                     settingsStore: settingsStore,

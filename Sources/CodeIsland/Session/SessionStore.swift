@@ -9,6 +9,7 @@ enum SessionEvent {
     case toolEnded(String, String)
     case permissionRequested(String)
     case permissionResponded(String, Bool)
+    case planRequested(String)
     case questionAsked(String)
     case pendingDismissedExternally(String)
     case notification(String, String)
@@ -367,6 +368,9 @@ final class SessionStore: ObservableObject {
                 )
                 onEvent.send(.questionAsked(sessionId))
             } else {
+                // Claude's ExitPlanMode carries the plan as markdown in a JSON
+                // string (`{"plan":…,"planFilePath":…}`) — route it to PlanView.
+                let plan = (toolName == "ExitPlanMode") ? Self.parsePlan(description) : nil
                 sessions[sessionId]?.status = .waitingPermission
                 sessions[sessionId]?.pendingPermission = PendingPermission(
                     toolName: toolName,
@@ -375,6 +379,8 @@ final class SessionStore: ObservableObject {
                     content: message.toolContent,
                     oldString: message.toolOldString,
                     newString: message.toolNewString,
+                    planMarkdown: plan?.plan,
+                    planFilePath: plan?.planFilePath,
                     respond: { [weak self] action in
                         Log.info("Permission responded: \(action) for session=\(sessionId.prefix(8)), respondRaw=\(respondRaw != nil)")
                         // State is already cleared by respondToPermission() synchronously.
@@ -426,10 +432,24 @@ final class SessionStore: ObservableObject {
                             } else {
                                 respond?(BridgeResponse.allow())
                             }
+                        case .approvePlan, .approvePlanAuto, .autoMode:
+                            // setMode is required: a plain allow leaves the
+                            // session's mode unchanged (incl. staying in plan
+                            // mode for ExitPlanMode). "default" = approve &
+                            // prompt each edit / "auto" = Claude's "⏵⏵ auto mode
+                            // on" (runs everything, gated by a safety classifier).
+                            // NOT "acceptEdits" — that's the narrower, separate
+                            // "⏵⏵ accept edits on" (edits only, bash still prompts).
+                            let mode = action == .approvePlan ? "default" : "auto"
+                            if let data = BridgeResponse.allowWithMode(mode), respondRaw != nil {
+                                respondRaw?(data)
+                            } else {
+                                respond?(BridgeResponse.allow())
+                            }
                         }
                     }
                 )
-                onEvent.send(.permissionRequested(sessionId))
+                onEvent.send(plan != nil ? .planRequested(sessionId) : .permissionRequested(sessionId))
             }
 
         case "Stop":
@@ -506,6 +526,17 @@ final class SessionStore: ObservableObject {
                 multiSelect: multiSelect
             )
         }
+    }
+
+    /// Parse Claude's ExitPlanMode tool_input — a JSON *string*
+    /// `{"plan":"<markdown>","planFilePath":"…/plans/<name>.md"}`.
+    private static func parsePlan(_ json: String?) -> (plan: String, planFilePath: String?)? {
+        guard let json, let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let plan = (obj["plan"] as? String), !plan.isEmpty else {
+            return nil
+        }
+        return (plan, obj["planFilePath"] as? String)
     }
 
     func respondToPermission(sessionId: String, action: PermissionAction) {
