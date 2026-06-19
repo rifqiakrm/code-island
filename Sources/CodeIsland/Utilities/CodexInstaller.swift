@@ -124,11 +124,12 @@ enum CodexInstaller {
             "hooks": [["type": "command", "command": command, "timeout": timeout]]
         ]
 
-        if let idx = entries.firstIndex(where: isOurs) {
-            entries[idx] = ourEntry
-        } else {
-            entries.append(ourEntry)
-        }
+        // Remove ALL existing Code Island entries (not just the first) before
+        // adding one — otherwise duplicates that accumulated from an older build
+        // persist, and Codex fires the bridge once per copy → N duplicate notch
+        // cards for a single turn (issue: "1 chat spawns 6 notifications").
+        entries.removeAll(where: isOurs)
+        entries.append(ourEntry)
         hooks[event] = entries
     }
 

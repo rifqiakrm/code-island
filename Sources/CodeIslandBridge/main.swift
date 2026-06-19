@@ -359,12 +359,23 @@ let assistantMessage: String? = {
         if providerSource == "antigravity", let p = agTranscriptPath {
             return agAssistantFromTranscript(p)
         }
+        // Codex puts the reply in `assistant_message` (NOT last_assistant_message).
+        // In plan mode that field is null and the reply (a <proposed_plan> block)
+        // lives only in the rollout transcript — fall back to reading it there.
+        if providerSource == "codex" {
+            if let m = payload["assistant_message"] as? String, !m.isEmpty { return m }
+            if let path = codexTranscriptPath(sessionId: sessionId) {
+                return codexAssistantFromTranscript(path)
+            }
+            return nil
+        }
         // Hermes' post_llm_call carries the reply as `assistant_response`,
         // possibly nested under `extra` — check both.
         let hermesExtra = payload["extra"] as? [String: Any]
         // Cursor's afterAgentResponse carries the reply in "text"/"message";
         // Gemini's AfterAgent uses "prompt_response".
         return payload["last_assistant_message"] as? String
+            ?? payload["assistant_message"] as? String           // Codex (top-level)
             ?? payload["prompt_response"] as? String
             ?? payload["assistant_response"] as? String          // Hermes (top-level)
             ?? hermesExtra?["assistant_response"] as? String      // Hermes (in extra)
@@ -415,6 +426,45 @@ func lastAssistantFromTranscript(_ path: String) -> String? {
         if !texts.isEmpty {
             return String(texts.joined(separator: "\n").prefix(500))
         }
+    }
+    return nil
+}
+
+/// Codex stores a per-session rollout transcript at
+/// ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sessionId>.jsonl. Find it by the
+/// id suffix in the filename. Only called when the Stop hook omitted the reply
+/// (Codex plan mode), so the directory walk runs rarely.
+func codexTranscriptPath(sessionId: String?) -> String? {
+    guard let sessionId, !sessionId.isEmpty else { return nil }
+    let base = (NSHomeDirectory() as NSString).appendingPathComponent(".codex/sessions")
+    guard let en = FileManager.default.enumerator(atPath: base) else { return nil }
+    let suffix = "-\(sessionId).jsonl"
+    for case let rel as String in en where rel.hasSuffix(suffix) {
+        return (base as NSString).appendingPathComponent(rel)
+    }
+    return nil
+}
+
+/// Walk a Codex rollout transcript backwards to the last assistant message and
+/// return its text, stripping the <proposed_plan> wrapper Codex uses in plan mode.
+func codexAssistantFromTranscript(_ path: String) -> String? {
+    guard let data = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+    for line in data.components(separatedBy: "\n").reversed() {
+        guard !line.isEmpty,
+              let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+              json["type"] as? String == "response_item",
+              let p = json["payload"] as? [String: Any],
+              p["type"] as? String == "message",
+              p["role"] as? String == "assistant",
+              let content = p["content"] as? [[String: Any]] else { continue }
+        var text = ""
+        for c in content {
+            text += (c["text"] as? String) ?? (c["output_text"] as? String) ?? ""
+        }
+        text = text.replacingOccurrences(of: "<proposed_plan>", with: "")
+                   .replacingOccurrences(of: "</proposed_plan>", with: "")
+                   .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty { return String(text.prefix(4000)) }
     }
     return nil
 }

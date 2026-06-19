@@ -354,8 +354,12 @@ final class SessionStore: ObservableObject {
                 return
             }
 
-            // Detect AskUserQuestion — show question UI instead of permission UI
-            if toolName == "AskUserQuestion", let desc = description,
+            // Detect a question tool — show the question UI instead of the
+            // generic permission card. Claude uses `AskUserQuestion`; Qwen fires
+            // the same Claude-shaped `questions` payload as `ask_user_question`
+            // (snake_case) via its native PermissionRequest.
+            if (toolName == "AskUserQuestion" || toolName == "ask_user_question"),
+               let desc = description,
                let parsedQuestions = Self.parseQuestion(desc) {
                 sessions[sessionId]?.status = .waitingPermission
                 sessions[sessionId]?.pendingQuestion = PendingQuestion(
@@ -453,7 +457,15 @@ final class SessionStore: ObservableObject {
             }
 
         case "Stop":
-            if let msg = message.assistantMessage {
+            // Codex emits its follow-up suggestions as a SEPARATE Stop whose
+            // assistant_message is a raw `{"suggestions":[…]}` object — never the
+            // real reply. Don't render that JSON, and if the turn already
+            // finished (the real reply's Stop already fired), drop it entirely so
+            // it doesn't pop a duplicate Finished card.
+            if let msg = message.assistantMessage, Self.isSuggestionsBlob(msg) {
+                if sessions[sessionId]?.status == .idle { return }
+                // otherwise complete the turn but keep the prior reply (if any)
+            } else if let msg = message.assistantMessage {
                 sessions[sessionId]?.lastAssistantMessage = msg
             }
             sessions[sessionId]?.status = .idle
@@ -526,6 +538,17 @@ final class SessionStore: ObservableObject {
                 multiSelect: multiSelect
             )
         }
+    }
+
+    /// Codex's "suggested follow-ups" arrive as an assistant_message that's a raw
+    /// JSON object `{"suggestions":[{"title":…,"description":…}]}` — never a reply
+    /// to show. Detect it so we don't render the JSON or pop a Finished card.
+    private static func isSuggestionsBlob(_ s: String) -> Bool {
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t.hasPrefix("{"), t.contains("\"suggestions\"") else { return false }
+        guard let data = t.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        return obj["suggestions"] != nil
     }
 
     /// Parse Claude's ExitPlanMode tool_input — a JSON *string*
@@ -662,12 +685,20 @@ final class SessionStore: ObservableObject {
     /// Defer the pending question to the terminal (Claude Code will prompt there).
     func deferQuestionToTerminal(sessionId: String) {
         guard let q = sessions[sessionId]?.pendingQuestion else { return }
+        let source = sessions[sessionId]?.source
         sessions[sessionId]?.pendingQuestion = nil
         sessions[sessionId]?.status = .thinking
-        if let data = BridgeResponse.deferToTerminal() {
-            q.respond(data)
-        }
-        // Jump to the terminal so the user can answer there
+        // Qwen's `ask_user_question` can't take a hook-supplied answer (no
+        // `answers` field in its schema). Per qwen-code's permissionFlow, its
+        // CLI dialog shows only when finalPermission is "ask"/"default" — `allow`
+        // skips it (empty answers) and `deny` blocks it. Returning an EMPTY hook
+        // response leaves finalPermission at "default", so Qwen shows its native
+        // dialog on the CLI and the user answers there. Everyone else uses
+        // behavior "ask" to defer to their own prompt.
+        let data: Data? = (source == "qwen")
+            ? Data("{}".utf8)
+            : BridgeResponse.deferToTerminal()
+        if let data { q.respond(data) }
         if let session = sessions[sessionId] {
             TerminalJumper.jump(to: session)
         }

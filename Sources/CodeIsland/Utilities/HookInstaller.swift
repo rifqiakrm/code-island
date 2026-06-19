@@ -148,13 +148,14 @@ enum HookInstaller {
     private static func addHookEntry(to hooks: inout [String: Any], event: String, command: String, timeout: Int?) {
         var eventHooks = hooks[event] as? [[String: Any]] ?? []
 
-        // Check if our hook already exists
-        let alreadyInstalled = eventHooks.contains { entry in
+        // Remove any existing Code Island entries (including duplicates that
+        // accumulated from an older build) before adding exactly one — otherwise
+        // each copy fires the bridge and the notch shows N cards for one turn.
+        let isOurs: ([String: Any]) -> Bool = { entry in
             guard let entryHooks = entry["hooks"] as? [[String: Any]] else { return false }
             return entryHooks.contains { ($0["command"] as? String)?.contains("code-island") == true }
         }
-
-        guard !alreadyInstalled else { return }
+        eventHooks.removeAll(where: isOurs)
 
         var hookDef: [String: Any] = [
             "type": "command",
