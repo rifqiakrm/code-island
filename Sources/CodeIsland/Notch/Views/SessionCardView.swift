@@ -29,6 +29,13 @@ struct SessionCardView: View {
         }
     }
 
+    /// Web-Slinger uses suit red for *thinking*, so a red error card would be
+    /// indistinguishable from a working one. `cardInkError` swaps it for the
+    /// black symbiote treatment. Every other theme leaves this nil.
+    private var cardInk: NotchCardInk? {
+        session.status == .error ? theme.cardInkError : nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Row 1: mascot + title + effort + time
@@ -136,7 +143,7 @@ struct SessionCardView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .notchCard(theme, tint: cardTint, active: isActive)
+        .notchCard(theme, tint: cardTint, active: isActive, ink: cardInk)
         .contentShape(Rectangle())
         .onTapGesture {
             TerminalJumper.jump(to: session)

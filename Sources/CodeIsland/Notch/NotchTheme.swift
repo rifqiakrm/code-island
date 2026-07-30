@@ -17,26 +17,29 @@ enum NotchThemeID: String, CaseIterable, Identifiable {
     case pixel
     case terminal
     case brutalist
+    case webSlinger
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .default:   return "Default"
-        case .glass:     return "Liquid Glass"
-        case .pixel:     return "Retro Pixel"
-        case .terminal:  return "Terminal"
-        case .brutalist: return "Brutalist"
+        case .default:    return "Default"
+        case .glass:      return "Liquid Glass"
+        case .pixel:      return "Retro Pixel"
+        case .terminal:   return "Terminal"
+        case .brutalist:  return "Brutalist"
+        case .webSlinger: return "Web-Slinger"
         }
     }
 
     var blurb: String {
         switch self {
-        case .default:   return "The original — pure black, monospaced, soft rounded cards."
-        case .glass:     return "Frosted translucency, pill controls, native macOS feel."
-        case .pixel:     return "8-bit chunky borders, square corners, hard offset shadows."
-        case .terminal:  return "Pure black, hairline dividers, near-invisible chrome."
-        case .brutalist: return "Thick borders, bold sans type, flat heavy fills."
+        case .default:    return "The original — pure black, monospaced, soft rounded cards."
+        case .glass:      return "Frosted translucency, pill controls, native macOS feel."
+        case .pixel:      return "8-bit chunky borders, square corners, hard offset shadows."
+        case .terminal:   return "Pure black, hairline dividers, near-invisible chrome."
+        case .brutalist:  return "Thick borders, bold sans type, flat heavy fills."
+        case .webSlinger: return "Midnight and suit red, corner webbing, and a masked spider on a thread."
         }
     }
 
@@ -56,6 +59,30 @@ enum NotchWindowFill {
     case solid(Color)
     /// A blur material plus a tint overlay to keep text legible.
     case material(Material, tint: Color)
+}
+
+/// Decorative geometry drawn into the window backdrop, behind all content.
+/// `nil` on every theme but Web-Slinger.
+enum NotchPattern: Equatable {
+    /// Webbing spun into both top corners. Draws itself in once on expand, then
+    /// holds static — see `WebOverlay`.
+    case web(thread: Color, alpha: Double)
+}
+
+/// A living inhabitant of the window backdrop. Also `nil` everywhere but
+/// Web-Slinger; kept separate from `NotchPattern` because it animates and
+/// reads session state, where a pattern is inert.
+enum NotchCreature: Equatable {
+    /// The masked spider, hanging `inset` points in from the trailing edge.
+    case spider(inset: CGFloat)
+}
+
+/// A fixed fill/stroke pair that replaces the tint-derived pair for one card
+/// state. Needed when a theme wants a card whose border is *not* a shade of its
+/// fill — Web-Slinger's symbiote error card is black with a silver edge.
+struct NotchCardInk: Equatable {
+    let fill: Color
+    let stroke: Color
 }
 
 /// How a theme treats pill corners. Pills are authored with a "base" radius
@@ -143,9 +170,28 @@ struct NotchTheme {
 
     /// Fixed activity hues (Pixel/Brutalist mockups): thinking cards go warm
     /// terracotta, idle cards go cool. `nil` = keep the per-status colour.
-    /// Error/waiting always keep their semantic red/orange (set in the view).
+    /// Waiting always keeps its semantic orange (set in the view).
     var cardHueActive: Color? = nil
     var cardHueIdle: Color? = nil
+
+    /// Overrides the error card's fill *and* border together. Only set by
+    /// Web-Slinger, where suit red is already the thinking hue and a red error
+    /// card would be indistinguishable from a working one — so error becomes the
+    /// black symbiote suit instead. `nil` keeps error semantically red.
+    ///
+    /// Currently dormant: nothing in the app ever sets `SessionStatus.error`.
+    var cardInkError: NotchCardInk? = nil
+
+    /// The one sanctioned exception to "themes never touch mascots": Web-Slinger
+    /// pulls its mask over Claude's crab and Codex's box. Every other mascot
+    /// ignores it, and no palette changes — the crab is still terracotta under
+    /// the hood, so status still reads.
+    var masksMascots: Bool = false
+
+    /// Backdrop decoration drawn behind all content when expanded.
+    var windowPattern: NotchPattern? = nil
+    /// Animated backdrop inhabitant, likewise expanded-only.
+    var windowCreature: NotchCreature? = nil
 
     /// Theme-aware font. Replaces `.system(size:weight:design:.monospaced)`
     /// call sites so a theme can swap the whole app between mono and sans.
@@ -169,6 +215,10 @@ struct NotchTheme {
             return (accent, .black, Color(red: 0.10, green: 0.10, blue: 0.11))
         case .pixel:
             return (accent.opacity(0.12), accent, accent)
+        case .webSlinger:
+            // Outlined like Pixel, but the soft tinted shadow gives each button
+            // a halo in its own semantic colour instead of a hard offset.
+            return (accent.opacity(0.14), accent, accent.opacity(0.95))
         default:
             return (accent.opacity(0.08), nil, accent.opacity(0.95))
         }
@@ -179,11 +229,12 @@ struct NotchTheme {
 
 extension NotchTheme {
     static let all: [NotchThemeID: NotchTheme] = [
-        .default:   .defaultTheme,
-        .glass:     .glassTheme,
-        .pixel:     .pixelTheme,
-        .terminal:  .terminalTheme,
-        .brutalist: .brutalistTheme,
+        .default:    .defaultTheme,
+        .glass:      .glassTheme,
+        .pixel:      .pixelTheme,
+        .terminal:   .terminalTheme,
+        .brutalist:  .brutalistTheme,
+        .webSlinger: .webSlingerTheme,
     ]
 
     /// Exact reproduction of the shipped v1.1.6 look. Changing nothing here is
@@ -312,6 +363,52 @@ extension NotchTheme {
         cardHueActive: Color(red: 0.88, green: 0.47, blue: 0.34),
         cardHueIdle: Color(red: 0.49, green: 0.83, blue: 0.99)
     )
+
+    /// Web-Slinger. Midnight ground, suit-red window edge, corner webbing, and a
+    /// masked spider on a thread. The one theme with a *soft* coloured shadow:
+    /// `tintedShadow` + a non-zero radius makes every surface halo in its own
+    /// hue (red while thinking, blue while idle, semantic on every button).
+    static let webSlingerTheme = NotchTheme(
+        id: .webSlinger,
+        windowFill: .solid(Color(red: 0.039, green: 0.055, blue: 0.122)), // #0A0E1F
+        windowStroke: Color(red: 0.902, green: 0.141, blue: 0.161),       // #E62429
+        windowStrokeWidth: 2,
+        cardRadius: 10,
+        boxRadius: 8,
+        pillCorner: .cap(8),
+        buttonRadius: 8,
+        strokeWidth: 1.5,
+        surfaceShadow: NotchShadow(
+            color: Color(red: 0.902, green: 0.141, blue: 0.161).opacity(0.30),
+            radius: 7, x: 0, y: 2
+        ),
+        neutralCardFill: Color(red: 0.075, green: 0.102, blue: 0.200),    // #131A33
+        neutralCardStroke: .white.opacity(0.10),
+        boxFill: Color(red: 0.024, green: 0.031, blue: 0.059),            // #06080F
+        boxStroke: Color(red: 0.902, green: 0.141, blue: 0.161).opacity(0.25),
+        cardTintFillActive: 0.16,
+        cardTintFillIdle: 0.08,
+        cardTintStrokeActive: 0.75,
+        cardTintStrokeIdle: 0.30,
+        // The only theme on `.rounded` — mono is taken three times over, and
+        // rounded heavy caps land near comic lettering without a webfont.
+        fontDesign: .rounded,
+        tintedShadow: true,
+        cardHueActive: Color(red: 0.902, green: 0.141, blue: 0.161),      // suit red
+        cardHueIdle: Color(red: 0.169, green: 0.310, blue: 0.839),        // suit blue
+        // Suit red is the thinking hue, so error can't also be red. It becomes
+        // the black symbiote suit — near-black fill, webbing-silver edge.
+        cardInkError: NotchCardInk(
+            fill: Color(red: 0.020, green: 0.024, blue: 0.043),
+            stroke: Color(red: 0.788, green: 0.824, blue: 0.910).opacity(0.85)
+        ),
+        masksMascots: true,
+        windowPattern: .web(thread: Color(red: 0.788, green: 0.824, blue: 0.910), alpha: 0.09),
+        // Inset clears the sound + gear buttons (they occupy the last ~62pt of
+        // the top row) and parks the spider in the empty span between them and
+        // the rate-limit readout.
+        windowCreature: .spider(inset: 100)
+    )
 }
 
 // MARK: - Environment plumbing
@@ -388,10 +485,15 @@ extension View {
     /// Drop-in replacement for the card background. When `tint` is given (the
     /// semantic status colour of a session card) the fill/border borrow the
     /// theme's tint opacities; otherwise the neutral card surface is used.
-    func notchCard(_ theme: NotchTheme, tint: Color? = nil, active: Bool = false) -> some View {
-        let fill: Color = tint.map { $0.opacity(active ? theme.cardTintFillActive : theme.cardTintFillIdle) }
+    /// `ink` bypasses the tint-derived fill/stroke entirely for cards whose
+    /// border isn't a shade of their fill (Web-Slinger's symbiote error card).
+    func notchCard(_ theme: NotchTheme, tint: Color? = nil, active: Bool = false,
+                   ink: NotchCardInk? = nil) -> some View {
+        let fill: Color = ink?.fill
+            ?? tint.map { $0.opacity(active ? theme.cardTintFillActive : theme.cardTintFillIdle) }
             ?? theme.neutralCardFill
-        let stroke: Color = theme.cardStrokeOverride
+        let stroke: Color = ink?.stroke
+            ?? theme.cardStrokeOverride
             ?? tint.map { $0.opacity(active ? theme.cardTintStrokeActive : theme.cardTintStrokeIdle) }
             ?? theme.neutralCardStroke
         return self

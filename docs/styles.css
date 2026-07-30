@@ -1020,6 +1020,30 @@ body.cine #record-stage .notch-shape { transition: width 0.6s cubic-bezier(0.34,
 .notch-shape[data-theme="brutalist"] .t-btn { border-radius:6px; border:3px solid #000; }
 .notch-shape[data-theme="brutalist"] .t-deny { background:#ff8080; color:#1a1010; }
 .notch-shape[data-theme="brutalist"] .t-allow { background:#7fd8e8; color:#101a1d; }
+/* webSlinger — midnight ground, suit-red edge, corner webbing, soft tinted
+   halos instead of hard offsets. The web is a CSS gradient stand-in for the
+   app's Canvas path; the demo notch is too small for the real geometry. */
+.notch-shape[data-theme="webSlinger"] {
+  background:#0a0e1f; border:2px solid #e62429; border-top:none;
+  font-family:'Inter',sans-serif;
+}
+.notch-shape[data-theme="webSlinger"]::after {
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:0.5;
+  background:
+    repeating-conic-gradient(from 200deg at 100% 0%, rgba(201,210,232,0.16) 0 1deg, transparent 1deg 13deg),
+    repeating-conic-gradient(from 8deg   at 0%   0%, rgba(201,210,232,0.16) 0 1deg, transparent 1deg 13deg),
+    repeating-radial-gradient(circle at 100% 0%, transparent 0 26px, rgba(201,210,232,0.13) 26px 27px),
+    repeating-radial-gradient(circle at 0%   0%, transparent 0 26px, rgba(201,210,232,0.13) 26px 27px);
+}
+.notch-shape[data-theme="webSlinger"] .state-themes { font-family:'Inter',sans-serif; }
+.notch-shape[data-theme="webSlinger"] .t-card {
+  border-radius:10px; background:rgba(230,36,41,0.16);
+  border:1.5px solid rgba(230,36,41,0.75); box-shadow:0 2px 7px rgba(230,36,41,0.5);
+}
+.notch-shape[data-theme="webSlinger"] .t-btn { border-radius:8px; border:1.5px solid; }
+.notch-shape[data-theme="webSlinger"] .t-deny  { border-color:#ff8080; box-shadow:0 2px 7px rgba(255,59,48,0.45); }
+.notch-shape[data-theme="webSlinger"] .t-allow { border-color:#7fd8e8; box-shadow:0 2px 7px rgba(52,199,89,0.45); }
+.notch-shape[data-theme="webSlinger"] .t-pill { border-radius:8px; }
 
 /* --- MASCOTS --- */
 .mascots-head { text-align:center; margin-bottom:12px; }

@@ -150,19 +150,26 @@ Live-fetched over HTTP (not statusline anymore):
 
 ## Theming
 
-`NotchTheme` (Sources/CodeIsland/Notch/NotchTheme.swift) is a pure token set that restyles the notch **chrome only**. Five themes, selectable in **Settings → Appearance** (live preview cards, instant switching):
+`NotchTheme` (Sources/CodeIsland/Notch/NotchTheme.swift) is a pure token set that restyles the notch **chrome only**. Six themes, selectable in **Settings → Appearance** (live preview cards, instant switching):
 
 - `default` — the original look, **unchanged** (load-bearing: existing users must see no difference)
 - `glass` — Liquid Glass (translucent `.ultraThinMaterial` window, capsule controls, sans font)
 - `pixel` — Retro 8-bit (dark cards, colored borders + colored hard offset shadows, square corners, mono)
 - `terminal` — minimal (pure black, hairline chrome, mono)
 - `brutalist` — Neo-Brutalist (vivid light cards + dark text, cream wells, black borders, hard white shadows, sans)
+- `webSlinger` — Web-Slinger (midnight ground, suit-red edge, corner webbing + a masked spider on a thread, rounded font)
 
 **Wiring**
 - Persisted as `SettingsStore.notchThemeID` (UserDefaults, same `@Published`+`didSet` pattern). No pref / first launch → `.default` (the `didSet` only writes on user change, so a fresh install never persists a theme).
 - `NotchContentView` reads `settingsStore.notchThemeID.theme` and injects `.environment(\.notchTheme, theme)`. Every view reads `@Environment(\.notchTheme) private var theme`.
 
 **Invariant — chrome only.** Themes restyle window fill/border, card/box/pill/button shape (radius, stroke width, shadow), and font *design* (mono ↔ sans). They never touch **semantic/brand colors**: provider accents, mascot palettes, status colors (cyan/green/orange/red), tool colors, action-button red/green/purple, rate-limit thresholds. `cardForeground`/`wellForeground` default to `.white`, so the four dark themes render text identically to Default; only `brutalist` opts into dark text on its light cards/cream wells.
+
+**Two sanctioned exceptions, both Web-Slinger, both opt-in via a `nil`-defaulting token:**
+- `masksMascots` draws a mask over Claude's crab and Codex's box (`PixelMascot.drawCrabMask` / `drawBoxMask`). Palettes are untouched — the shell below the hood still carries the status colour.
+- `cardInkError` replaces the error card's fill *and* border. Needed because Web-Slinger's `cardHueActive` is suit red, so a semantically-red error card would be indistinguishable from a thinking one; error becomes the black symbiote card instead. Passed through the new `notchCard(…, ink:)` parameter. **Currently dormant** — nothing in the app ever assigns `SessionStatus.error` (`SessionStore` only sets completed/idle/thinking/toolUse/waitingPermission), so this, the `.error` mascot palette, and the "Error" sound in Settings are all unreachable until tool-failure detection is wired into `PostToolUse`.
+
+**Backdrop layer.** `windowPattern` (`.web`) and `windowCreature` (`.spider`) draw *behind* all content in `NotchBackground`, expanded-only. Both live in `WebSlingerSpider.swift`. The spider's lenses are a status readout driven by `NotchContentView.spiderLens` (error → waiting → thinking → idle) and its legs tick on the crab's `Timer.publish(every: 0.15)` / `animPhase % 4` **only while a session is active** — the notch is a transparent overlay, so an always-on animation costs real CPU (see the v1.4.5 perf fix). The web spins in once on expand and then never redraws.
 
 **Tokens & helpers**
 - `theme.font(size:weight:)` — replaces `.system(…, design: .monospaced)` so a theme swaps the whole app mono↔sans.
@@ -195,6 +202,8 @@ All mascots are Canvas-drawn pixel art in `PixelMascot.swift`, authored in a 52-
 - **Kiro** ghost, **Pi**/**Oh My Pi** π-creature (amber/teal, shared `.piGlyph`), **AntiGravity** orbiting planet, **Hermes** winged helmet.
 
 The provider mascots are drawn via the shared `drawShape(...)` helper, which applies a **whole-body bounce** when `animate` is true (the "thinking" liveliness) — no per-mascot leg rig. Color swaps via `mascotPalette` vs `activeMascotPalette`; transient statuses (thinking/error/waiting) override the provider palette so status reads at a glance (`SessionMascot.paletteFor`).
+
+`PixelMascot.masked` (set from `NotchTheme.masksMascots`, so only Web-Slinger) overlays a mask on **crab and box only** — they're the two shapes with a readable pair of eyes to cover. Every other shape ignores the flag: masking a star or a ghost reads as a smudge. The lenses need their dark outline rect underneath; a bare white block reads as a robot eye, not Spider-Man.
 
 The newest mascots (Kiro … Hermes) are brand-original pixel art (no reference gif existed). README/onboarding/What's-New render the live `PixelMascot` code to `docs/mascots/<id>.png`. CLI icons live at `Resources/cli-icons/<id>.png` — real logos for all 17 (Kiro/Oh My Pi supplied by the maintainer).
 

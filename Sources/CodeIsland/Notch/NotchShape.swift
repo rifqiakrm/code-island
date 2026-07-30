@@ -50,6 +50,14 @@ struct NotchBackground: View {
     /// its content instead, so scrolling cards can't cover the window edge).
     /// Defaults true for standalone uses (onboarding faux notch, theme previews).
     var drawBorder: Bool = true
+    /// How the theme's creature (if any) sets its lenses — driven by aggregate
+    /// session state. Ignored by themes without a `windowCreature`.
+    var creatureLens: SpiderLens = .wide
+    /// Whether the creature's idle animation ticks. False keeps it perfectly
+    /// still, which is what an idle notch should cost.
+    var creatureAnimates: Bool = false
+
+    @State private var webProgress: CGFloat = 0
 
     var body: some View {
         if isExpanded {
@@ -58,14 +66,38 @@ struct NotchBackground: View {
             // the hardware notch — a tinted fill or edge reads as a pasted-on
             // widget and breaks the illusion.
             if drawBorder {
-                fill.overlay(border)
+                themedFill.overlay(border)
             } else {
-                fill
+                themedFill
             }
         } else {
             NotchShape(cornerRadius: cornerRadius)
                 .fill(.black)
         }
+    }
+
+    /// The window fill plus any backdrop decoration. Everything here sits behind
+    /// the panel's content — the web and the spider read through the translucent
+    /// cards rather than competing with them for space.
+    @ViewBuilder
+    private var themedFill: some View {
+        fill
+            .overlay {
+                if case .web(let thread, let alpha) = theme.windowPattern {
+                    WebOverlay(thread: thread, alpha: alpha, progress: webProgress)
+                        .onAppear {
+                            // Spins itself in once, then never redraws again.
+                            withAnimation(.easeOut(duration: 0.55)) { webProgress = 1 }
+                        }
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if case .spider(let inset) = theme.windowCreature {
+                    WebSlingerSpider(lens: creatureLens, animate: creatureAnimates)
+                        .padding(.trailing, inset)
+                }
+            }
+            .clipShape(NotchShape(cornerRadius: cornerRadius))
     }
 
     /// The window edge border, exposed so a parent can render it on top of its

@@ -35,7 +35,7 @@
   <!-- HERO -->
   <header class="hero" id="top">
     <div class="hero-inner">
-      <span class="eyebrow">v1.4.9 · macOS 14+ · Open source</span>
+      <span class="eyebrow">v1.4.10 · macOS 14+ · Open source</span>
       <h1>Your AI coding agents,<br/><span class="accent">live in the notch.</span></h1>
       <p class="subtitle">
         Monitor sessions, approve permissions, answer questions, and jump back to your terminal —<br/>
@@ -432,7 +432,7 @@
             <div class="theme-dots">
               <span class="tdot" data-i="0"></span><span class="tdot" data-i="1"></span>
               <span class="tdot" data-i="2"></span><span class="tdot" data-i="3"></span>
-              <span class="tdot" data-i="4"></span>
+              <span class="tdot" data-i="4"></span><span class="tdot" data-i="5"></span>
             </div>
           </div>
 
@@ -933,7 +933,7 @@ swift build -c release
         { state: 'perm',     head: 'Approve without<br>leaving flow.',  hold: 3800 },
         { state: 'plan',     head: 'See the plan,<br>not the JSON.',     hold: 4400 },
         { state: 'finished', head: 'Know the moment<br>it ships.',      hold: 3400 },
-        { state: 'themes',   head: 'Five looks.<br>Your vibe.',         hold: 7600 },
+        { state: 'themes',   head: 'Six looks.<br>Your vibe.',         hold: 7600 },
         { state: 'mascots',  head: '17 agents.<br>17 mascots.',         hold: 3900 },
         { state: 'jumpto',   head: 'One click<br>to your terminal.',    hold: 3800 },
         { state: 'sound',    head: 'A chirp for<br>every beat.',        hold: 3400 },
@@ -949,7 +949,7 @@ swift build -c release
         { card: 'more',                                                 hold: 1700 },
         { state: 'list',    head: 'Every session.',          hold: 1900 },
         { state: 'perm',    head: 'Approve in a tap.',       hold: 1900 },
-        { state: 'themes',  head: 'Five looks.',             hold: 3000 },
+        { state: 'themes',  head: 'Six looks.',             hold: 3000 },
         { state: 'mascots', head: '17 mascots.',             hold: 2100 },
         { state: 'jumpto',  head: 'Jump to your terminal.',  hold: 2100 },
         { state: 'sound',   head: 'A chirp for every beat.', hold: 2000 },
@@ -961,8 +961,8 @@ swift build -c release
       window.__loopMs = seq.reduce((a, s) => a + s.hold, 0);
 
       // Theme carousel — while the Themes panel is showing, rotate the notch
-      // chrome through all five themes (matches Settings → Appearance).
-      const THEMES = ['default', 'glass', 'pixel', 'terminal', 'brutalist'];
+      // chrome through all six themes (matches Settings → Appearance).
+      const THEMES = ['default', 'glass', 'pixel', 'terminal', 'brutalist', 'webSlinger'];
       const themeName = shape.querySelector('.theme-name');
       const tdots = [...shape.querySelectorAll('.tdot')];
       let themeTimer = null;
@@ -971,7 +971,7 @@ swift build -c release
         const apply = () => {
           const name = THEMES[t];
           shape.dataset.theme = name;
-          if (themeName) themeName.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+          if (themeName) themeName.textContent = name === 'webSlinger' ? 'Web-Slinger' : name.charAt(0).toUpperCase() + name.slice(1);
           tdots.forEach((d, k) => d.style.background = k === t ? 'var(--accent-2)' : 'rgba(255,255,255,0.18)');
           t = (t + 1) % THEMES.length;
         };

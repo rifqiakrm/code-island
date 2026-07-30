@@ -575,6 +575,9 @@ struct WhatsNewView: View {
     }
 
     private let highlights: [Highlight] = [
+        .init(symbol: "circle.hexagongrid.fill", tint: Color(red: 0.902, green: 0.141, blue: 0.161),
+              title: "New theme: Web-Slinger",
+              detail: "Midnight and suit red, webbing spun into the corners, and a masked spider that abseils in on a thread — Settings → Appearance."),
         .init(symbol: "sparkles", tint: Color(red: 0.62, green: 0.42, blue: 1.0),
               title: "17 coding agents, one notch",
               detail: "Claude, Codex, Gemini, Cursor, Copilot, Kiro, Pi, Qwen, Qoder, Factory, CodeBuddy, Kimi, OpenCode, Cline & more — side by side."),

@@ -38,7 +38,7 @@
 - **Dynamic terminal detection** — iTerm2, Ghostty, Terminal.app, VS Code, JetBrains, Codex.app, and more
 - **8-bit sound effects** — per-event sound picker (built-in chime / off / your own), an in-app sound library with an "Add Sound…" importer, and ▶ previews
 - **Pixel-art mascots** — every agent gets its own hand-drawn pixel mascot that animates by status
-- **Notch themes** — 5 looks (Default, Liquid Glass, Retro Pixel, Terminal, Neo-Brutalist), switch live in Settings → Appearance
+- **Notch themes** — 6 looks (Default, Liquid Glass, Retro Pixel, Terminal, Neo-Brutalist, Web-Slinger), switch live in Settings → Appearance
 - **Works without a notch** — on Macs with a notch the panel sits in the notch; on external displays / older Macs it shows as a compact bar at the top center
 
 ## Supported Tools
@@ -102,8 +102,9 @@ Open **Settings → Appearance** to restyle the notch windows. Switching is inst
 - **Retro Pixel** — 8-bit chunky borders, square corners, colored hard shadows
 - **Terminal** — pure black with hairline chrome, disappears into the notch
 - **Neo-Brutalist** — bold light cards, thick black borders, hard shadows, cream code wells
+- **Web-Slinger** — midnight and suit red, webbing spun into the corners, and a masked spider that abseils in on a thread
 
-Themes only restyle the *chrome*. Your mascots, status colors, and rate-limit warnings stay consistent across all of them. New installs start on **Default**.
+Themes only restyle the *chrome*. Your mascots, status colors, and rate-limit warnings stay consistent across all of them — the one exception is Web-Slinger, which puts a mask on Claude's crab and Codex's box (palettes untouched, so status still reads). New installs start on **Default**.
 
 ## Architecture
 

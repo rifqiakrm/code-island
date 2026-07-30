@@ -8,6 +8,10 @@ struct PixelMascot: View {
     var palette: MascotPalette = .claude
     var shape: MascotShape = .crab
     var animate: Bool = false
+    /// Pulls the Web-Slinger mask over the mascot. Honoured only by `.crab` and
+    /// `.box` — they're the two shapes with a readable face to cover; every
+    /// other mascot ignores it.
+    var masked: Bool = false
 
     @State private var animPhase: Int = 0
     private let animTimer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
@@ -95,8 +99,12 @@ struct PixelMascot: View {
     var body: some View {
         Canvas { context, canvasSize in
             switch shape {
-            case .crab:        drawCrab(context: context, canvasSize: canvasSize)
-            case .box:         drawBox(context: context, canvasSize: canvasSize)
+            case .crab:
+                drawCrab(context: context, canvasSize: canvasSize)
+                if masked { drawCrabMask(context: context, canvasSize: canvasSize) }
+            case .box:
+                drawBox(context: context, canvasSize: canvasSize)
+                if masked { drawBoxMask(context: context, canvasSize: canvasSize) }
             case .sparkle:     drawSparkle(context: context, canvasSize: canvasSize)
             case .geminiStar:  drawShape(context, canvasSize, 44, drawGeminiStar)
             case .qwenGem:     drawShape(context, canvasSize, 54, drawQwenGem)
@@ -221,6 +229,66 @@ struct PixelMascot: View {
         let off = animate ? footOffsets[animPhase % 4] : [0, 0]
         fill(CGRect(x: 14, y: baseY, width: 10, height: footHeight + off[0]), palette.body)
         fill(CGRect(x: 34, y: baseY, width: 10, height: footHeight + off[1]), palette.body)
+    }
+
+    // MARK: - Web-Slinger mask
+
+    // The one sanctioned exception to "themes never touch mascots". Drawn on top
+    // of the finished mascot, so it covers the eyes the shape already painted.
+    // Only the crab and the box wear one: masking a mascot whose face isn't a
+    // pair of eyes (Gemini's star, Kiro's ghost) reads as a smudge, not a mask.
+
+    private static let maskRed  = Color(red: 0.902, green: 0.141, blue: 0.161)
+    private static let maskSeam = Color(red: 0.039, green: 0.047, blue: 0.086)
+    private static let maskLens = Color(red: 0.957, green: 0.969, blue: 1.000)
+
+    /// Crab: a hood pulled down over the eyes, leaving the lower shell showing
+    /// so the status palette still reads underneath.
+    private func drawCrabMask(context: GraphicsContext, canvasSize: CGSize) {
+        let scale = size / 52.0
+        let xOffset = (canvasSize.width - 66 * scale) / 2
+        let t = CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0)
+        func fill(_ rect: CGRect, _ color: Color) {
+            context.fill(Path(rect).applying(t), with: .color(color))
+        }
+        // The antennae go under the hood too — left bare they read as blue ears
+        // stuck on the side of a red mask.
+        fill(CGRect(x: 0,  y: 13, width: 6, height: 13), Self.maskRed)
+        fill(CGRect(x: 60, y: 13, width: 6, height: 13), Self.maskRed)
+        // Hood across the shell (body spans x 6…60), hemmed with a dark edge.
+        fill(CGRect(x: 6, y: 0,  width: 54, height: 22), Self.maskRed)
+        fill(CGRect(x: 6, y: 22, width: 54, height: 2),  Self.maskSeam)
+        // Centre web seam, splitting the lenses.
+        fill(CGRect(x: 32, y: 0, width: 2, height: 22), Self.maskSeam)
+        // Lenses over where the crab's eyes were (x 12…18 / 48…54). The dark
+        // rect underneath is the outline — a bare white block reads as a robot
+        // eye, and the heavy black border is what makes it Spider-Man's lens.
+        fill(CGRect(x: 9,  y: 8, width: 15, height: 12), Self.maskSeam)
+        fill(CGRect(x: 42, y: 8, width: 15, height: 12), Self.maskSeam)
+        fill(CGRect(x: 10, y: 9, width: 13, height: 10), Self.maskLens)
+        fill(CGRect(x: 43, y: 9, width: 13, height: 10), Self.maskLens)
+    }
+
+    /// Box: same treatment, hemmed high enough that the terminal-prompt face
+    /// still peeks out below like a mouth under the mask.
+    private func drawBoxMask(context: GraphicsContext, canvasSize: CGSize) {
+        let scale = size / 52.0
+        let xOffset = (canvasSize.width - 58 * scale) / 2
+        let t = CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: xOffset / scale, y: 0)
+        func fill(_ rect: CGRect, _ color: Color) {
+            context.fill(Path(rect).applying(t), with: .color(color))
+        }
+        // Follows the box's own silhouette: head bump, shoulders, upper body.
+        fill(CGRect(x: 23, y: 0,  width: 12, height: 7),  Self.maskRed)
+        fill(CGRect(x: 6,  y: 7,  width: 46, height: 7),  Self.maskRed)
+        fill(CGRect(x: 0,  y: 14, width: 58, height: 16), Self.maskRed)
+        fill(CGRect(x: 0,  y: 30, width: 58, height: 2),  Self.maskSeam)
+        fill(CGRect(x: 28, y: 0,  width: 2,  height: 30), Self.maskSeam)
+        // Outlined lenses, same reasoning as the crab's.
+        fill(CGRect(x: 5,  y: 15, width: 20, height: 12), Self.maskSeam)
+        fill(CGRect(x: 33, y: 15, width: 20, height: 12), Self.maskSeam)
+        fill(CGRect(x: 6,  y: 16, width: 18, height: 10), Self.maskLens)
+        fill(CGRect(x: 34, y: 16, width: 18, height: 10), Self.maskLens)
     }
 
     // MARK: - Sparkle (Gemini placeholder — 4-pointed star)
@@ -603,12 +671,15 @@ struct SessionMascot: View {
     var animated: Bool = true
     var provider: AIProvider = .claude
 
+    @Environment(\.notchTheme) private var theme
+
     var body: some View {
         PixelMascot(
             size: size,
             palette: paletteFor(status),
             shape: provider.mascotShape,
-            animate: animated && isActive
+            animate: animated && isActive,
+            masked: theme.masksMascots
         )
     }
 

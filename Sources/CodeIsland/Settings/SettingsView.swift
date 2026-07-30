@@ -784,6 +784,18 @@ private struct ThemePreviewCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack {
                     swatchBackground
+                    // Themes with backdrop decoration preview it at reduced
+                    // scale, otherwise the picker can't show what sets them
+                    // apart. Static — the spin-in belongs to the real window.
+                    if case .web(let thread, let alpha) = theme.windowPattern {
+                        // 0.57 × width, the same ratio the real 600pt panel uses.
+                        WebOverlay(thread: thread, alpha: alpha, progress: 1, reach: 105)
+                    }
+                    if case .spider = theme.windowCreature {
+                        WebSlingerSpider(lens: .narrow, animate: false, unit: 0.85)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                            .padding(.trailing, 14)
+                    }
                     // Mini session card built from the theme's own tokens.
                     HStack(spacing: 6) {
                         Circle()

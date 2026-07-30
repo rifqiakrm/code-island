@@ -10,13 +10,29 @@ struct NotchContentView: View {
 
     private var theme: NotchTheme { settingsStore.notchThemeID.theme }
 
+    /// The backdrop spider's lenses double as a status readout, so they reflect
+    /// the *worst* thing happening across every session — errors outrank pending
+    /// approvals, which outrank work in progress.
+    private var spiderLens: SpiderLens {
+        let statuses = sessionStore.activeSessions.values.map(\.status)
+        if statuses.contains(.error) { return .symbiote }
+        if statuses.contains(.waitingPermission) { return .alarmed }
+        if statuses.contains(.thinking) || statuses.contains(.toolUse) { return .narrow }
+        return .wide
+    }
+
     var body: some View {
         ZStack {
             NotchBackground(
                 theme: theme,
                 isExpanded: viewModel.isExpanded,
                 cornerRadius: viewModel.isExpanded ? 20 : 17,
-                drawBorder: false
+                drawBorder: false,
+                creatureLens: spiderLens,
+                // Legs only twitch while something is actually running — an idle
+                // notch stays perfectly still (this is a transparent overlay, so
+                // every animated frame recomposites the whole window area).
+                creatureAnimates: spiderLens == .narrow
             )
 
             content
